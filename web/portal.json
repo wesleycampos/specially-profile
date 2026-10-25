@@ -1,0 +1,9 @@
+{
+  "nome": "Specially Profile",
+  "descricao": "Gestão do corpo clínico: desempenho dos profissionais, perda de pacientes e motivos, áreas, grupos e satisfação.",
+  "icone": "🩺",
+  "cor": "#0F9AA8",
+  "ordem": 6,
+  "status": "Disponível",
+  "visivel": true
+}

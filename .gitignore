@@ -1,0 +1,17 @@
+# Acessos e segredos (nunca vão para o GitHub)
+ACESSO*.txt
+*.token
+web/config.local.php
+.env
+
+# Dados de pacientes (LGPD): levar por pendrive/OneDrive se precisar no outro PC
+db/*.db
+db/fotos/
+dados/
+v1-planilha/base.xlsx
+
+# Sistema / editor
+Thumbs.db
+desktop.ini
+.DS_Store
+.claude/settings.local.json

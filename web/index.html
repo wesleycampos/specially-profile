@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Specially Profile</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="stylesheet" href="style.css?v=7">
+<script src="vendor/chart.umd.min.js"></script>
+</head>
+<body>
+<nav class="side" id="nav">
+  <div class="logo">S</div>
+  <a href="#visao" data-s="visao"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Visão</a>
+  <a href="#ranking" data-s="ranking"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>Ranking</a>
+  <a href="#profissionais" data-s="profissionais"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 14.5a5 5 0 0 1 6 5"/></svg>Equipe</a>
+  <a href="#individual" data-s="individual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M5 21v-1a7 7 0 0 1 14 0v1"/><path d="M16 14l2 2 4-4"/></svg>Individual</a>
+  <a href="#areas" data-s="areas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Áreas</a>
+  <a href="#perdas" data-s="perdas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l6 6 4-4 8 8"/><path d="M21 11v6h-6"/></svg>Perdas</a>
+  <a href="#pacientes" data-s="pacientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M8 14h3"/></svg>Pacientes</a>
+  <a href="#satisfacao" data-s="satisfacao"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>Satisfação</a>
+  <div class="sp"></div>
+  <a href="#cadastros" data-s="cadastros"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/></svg>Cadastros</a>
+  <a href="#importar" data-s="importar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>Importar</a>
+  <!--SAIR-->
+  <a href="#" id="theme" title="Alternar tema"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/></svg>Tema</a>
+</nav>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1 id="title">Gestão do Corpo Clínico</h1>
+      <div class="sub" id="sub">Carregando…</div>
+    </div>
+    <div class="filters">
+      <label>De</label><select id="fDe"></select>
+      <label>Até</label><select id="fAte"></select>
+      <label>Área</label><select id="fEsp"></select>
+      <label>Convênio</label><select id="fConv"></select>
+      <label title="Separa perdas em atendimento individual e em grupo">Modalidade</label><select id="fMod"><option value="">Todas</option><option value="individual">Individual</option><option value="grupo">Grupo</option></select>
+      <button class="ghost" id="fClear">Limpar</button>
+    </div>
+  </header>
+
+  <!-- VISÃO GERAL -->
+  <section class="section" id="s-visao">
+    <div id="avisos"></div>
+    <div class="kpis" id="kpis"></div>
+    <div class="grid g21">
+      <div class="card">
+        <div class="card-head"><div><h2>Evolução das saídas</h2><div class="hint">Por mês, empilhado pela categoria do motivo</div></div></div>
+        <div class="legend" id="legMot"></div>
+        <div class="chartbox"><canvas id="cSerie"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Por que estamos perdendo pacientes</h2>
+        <div class="hint">Categoria do motivo de saída</div>
+        <div class="chartbox"><canvas id="cMotivos"></canvas></div>
+      </div>
+    </div>
+    <div class="grid g2">
+      <div class="card">
+        <div class="card-head"><div><h2>Atenção: mais perdas no período</h2><div class="hint">Clique para abrir o profissional</div></div><a class="btn" href="#ranking">Ver ranking</a></div>
+        <div id="atencao"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h2>Áreas</h2><div class="hint">Saídas e % por faltas em cada especialidade</div></div><a class="btn" href="#areas">Comparar áreas</a></div>
+        <div id="areasMini"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RANKING -->
+  <section class="section" id="s-ranking">
+    <div class="card">
+      <div class="card-head">
+        <div><h2>Ranking dos profissionais</h2><div class="hint" id="rkHint"></div></div>
+        <div class="filters"><label>Área</label><select id="rkEsp"><option value="">Todas (cada um vs sua área)</option></select></div>
+      </div>
+      <div class="seg" id="rkMetric"></div>
+    </div>
+    <div class="rk2">
+      <div class="card rk-col"><h3>🏆 <span id="rkBestT">Destaques</span></h3><div class="hint" id="rkBestH"></div><div class="podium" id="podBest"></div><div class="tablewrap" style="max-height:330px"><table id="rkBest"></table></div></div>
+      <div class="card rk-col rk-bad"><h3>⚠️ <span id="rkWorstT">Atenção</span></h3><div class="hint" id="rkWorstH"></div><div class="podium" id="podWorst"></div><div class="tablewrap" style="max-height:330px"><table id="rkWorst"></table></div></div>
+    </div>
+  </section>
+
+  <!-- INDIVIDUAL -->
+  <section class="section" id="s-individual">
+    <div class="indiv-wrap">
+      <aside class="ind-side">
+        <div><h4>Área</h4><div class="ind-list" id="indEsp" style="max-height:none"></div></div>
+        <hr>
+        <div><h4>Profissional</h4><input type="search" id="indBusca" placeholder="Buscar…" style="margin-bottom:6px"><div class="ind-list" id="indProfs"></div></div>
+        <hr>
+        <div class="ind-photo" id="indPhoto"></div>
+        <table class="ind-mini" id="indMini"></table>
+      </aside>
+      <div class="ind-main">
+        <div class="ind-kpis" id="indKpis"></div>
+        <div class="ind-panel"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M3 21h18"/></svg>Pacientes perdidos por mês</h3>
+          <div class="pb"><div class="ind-legend"><span><i></i>Profissional</span><span><i class="d"></i>Média por profissional da área</span></div><div class="chartbox"><canvas id="cIndMes"></canvas></div></div></div>
+        <div class="ind-row">
+          <div class="ind-panel"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>Perdas por convênio</h3><div class="pb"><div class="chartbox"><canvas id="cIndConv"></canvas></div></div></div>
+          <div class="ind-panel"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>Motivos das perdas</h3><div class="pb"><div class="chartbox"><canvas id="cIndMot"></canvas></div></div></div>
+        </div>
+        <div class="ind-row">
+          <div class="ind-panel"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Comparado à média da área</h3><div class="pb" id="indBul"></div></div>
+          <div class="ind-panel"><h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/></svg>Pacientes que saíram</h3><div class="pb"><div class="tablewrap" id="indPac"></div></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EQUIPE -->
+  <section class="section" id="s-profissionais">
+    <div class="card" style="padding:12px 16px">
+      <div class="filters">
+        <input type="search" id="pcBusca" placeholder="Buscar profissional, formação ou competência…" style="min-width:260px;flex:1">
+        <label>Ordenar</label>
+        <select id="pcSort">
+          <option value="saidas">Mais saídas</option><option value="score">Melhor score</option><option value="score_asc">Pior score</option>
+          <option value="pct_faltas_saida">% saídas por faltas</option><option value="pct_evitaveis">% perdas evitáveis</option><option value="saidas_grupo">Perdas em grupo</option><option value="carteira">Maior carteira</option>
+          <option value="nota">Melhor satisfação</option><option value="faturamento">Maior faturamento</option><option value="nome">Nome</option>
+        </select>
+        <label><input type="checkbox" id="pcMov" checked> só com movimento</label>
+      </div>
+      <div class="hint" style="margin:8px 0 0">A linha vertical em cada barra é a média da área do profissional. Verde = melhor que a média, laranja = próximo, vermelho = pior.</div>
+    </div>
+    <div class="pcards" id="pcards"></div>
+  </section>
+
+  <!-- ÁREAS -->
+  <section class="section" id="s-areas">
+    <div class="card">
+      <h2>Comparativo entre áreas</h2>
+      <div class="hint">Clique no cabeçalho para ordenar · clique numa área para filtrar o painel inteiro</div>
+      <div class="tablewrap"><table id="areasTable"></table></div>
+    </div>
+    <div class="grid g2">
+      <div class="card"><h2>Saídas por profissional</h2><div class="hint">Média de pacientes perdidos por profissional da área</div><div class="chartbox"><canvas id="cAreaSP"></canvas></div></div>
+      <div class="card"><h2>% das saídas causadas por faltas</h2><div class="hint">Quanto da perda vem de faltas consecutivas</div><div class="chartbox"><canvas id="cAreaF"></canvas></div></div>
+    </div>
+    <div class="card">
+      <h2>Área × motivo de saída</h2>
+      <div class="hint">Onde cada motivo pesa mais</div>
+      <div class="tablewrap" style="max-height:none"><table class="heat" id="heatArea"></table></div>
+    </div>
+  </section>
+
+  <!-- PERDAS -->
+  <section class="section" id="s-perdas">
+    <div class="card">
+      <div class="card-head"><div><h2>Individual × Grupo</h2><div class="hint">Perdas de pacientes atendidos em grupo têm outra dinâmica. Marque os vínculos de grupo com <b>(G)</b> na planilha, pelo botão <span class="gtog on">G</span> na lista de saídas, ou cadastrando o profissional como "só grupo".</div></div></div>
+      <div class="grid g2"><div id="modCmp"></div><div id="grpTable"></div></div>
+    </div>
+    <div class="grid g2">
+      <div class="card"><h2>Saídas por convênio</h2><div class="hint">Total e quantas por faltas</div><div class="chartbox"><canvas id="cConv"></canvas></div></div>
+      <div class="card"><h2>Convênio × motivo</h2><div class="hint">Quantidade de saídas</div><div class="tablewrap" style="max-height:none"><table class="heat" id="heatConv"></table></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h2>Profissionais que mais perderam pacientes</h2><div class="hint">Expanda para ver paciente, data e motivo de cada saída</div></div>
+        <input type="search" id="plBusca" placeholder="Filtrar profissional…"></div>
+      <div id="perdasProf"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h2>Todas as saídas</h2><div class="hint" id="sdCount"></div></div>
+        <div class="filters"><select id="sdMot"></select><input type="search" id="sdBusca" placeholder="Buscar paciente, profissional, observação…" style="min-width:260px"><button id="sdCsv">Exportar CSV</button></div></div>
+      <div class="tablewrap"><table id="sdTable"></table></div>
+    </div>
+  </section>
+
+  <!-- PACIENTES -->
+  <section class="section" id="s-pacientes">
+    <div class="kpis" id="pacKpis"></div>
+    <div class="grid g2">
+      <div class="card"><h2>Pacientes ativos há mais tempo</h2><div class="hint">Pela data de início na clínica</div><div id="pacAntigos"></div></div>
+      <div class="card"><h2>Pacientes que mais faltam</h2><div class="hint">Faltas sobre sessões agendadas no período · risco de saída</div><div id="pacFaltosos"></div></div>
+    </div>
+    <div class="card"><h2>Pacientes com mais de uma saída registrada</h2><div class="hint">Voltaram e saíram de novo</div><div id="pacReinc"></div></div>
+  </section>
+
+  <!-- SATISFAÇÃO -->
+  <section class="section" id="s-satisfacao">
+    <div class="kpis" id="satKpis"></div>
+    <div class="grid g2">
+      <div class="card"><h2>NPS por área</h2><div class="hint">% promotores (9–10) − % detratores (0–6)</div><div class="chartbox"><canvas id="cNpsArea"></canvas></div></div>
+      <div class="card"><h2>Profissionais melhor e pior avaliados</h2><div class="hint">Mínimo de 3 avaliações</div><div id="satProf"></div></div>
+    </div>
+    <div class="card"><h2>Comentários recentes</h2><div id="satCom"></div></div>
+  </section>
+
+  <!-- CADASTROS -->
+  <section class="section" id="s-cadastros">
+    <div class="card">
+      <div class="card-head"><div><h2>Profissionais</h2><div class="hint">Formação, registro, admissão, meta de carteira e competências. Clique para editar.</div></div>
+        <div class="filters"><input type="search" id="cdBusca" placeholder="Buscar…"><label><input type="checkbox" id="cdInativos"> mostrar inativos</label><button class="primary" id="cdNovo">+ Novo profissional</button></div></div>
+      <div class="tablewrap"><table id="cdTable"></table></div>
+    </div>
+    <div class="card">
+      <h2>Convênios — valor por sessão</h2>
+      <div class="hint">Usado para calcular rentabilidade quando o atendimento importado não traz o valor</div>
+      <div class="tablewrap" style="max-width:560px"><table id="convTable"></table></div>
+    </div>
+  </section>
+
+  <!-- IMPORTAR -->
+  <section class="section" id="s-importar">
+    <div class="notice"><span>ℹ️</span><div>Baixe o modelo, preencha no Excel e importe aqui. O banco fica em <b>db/clinica.db</b> (SQLite). Cada importação de <b>saídas</b> e de <b>pacientes ativos</b> substitui a anterior; atendimentos e avaliações são somados sem duplicar.</div></div>
+    <div class="grid g3" id="impCards"></div>
+  </section>
+</div>
+
+<dialog id="dlg"></dialog>
+<script src="app.js?v=7"></script>
+</body>
+</html>

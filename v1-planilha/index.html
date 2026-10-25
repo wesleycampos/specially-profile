@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saídas de Pacientes</title>
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/chart.umd.min.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#f4f4f2; --surface:#fcfcfb; --surface-2:#f0efec; --border:#e2e1dc;
+  --text:#0b0b0b; --text-2:#52514e; --muted:#8a8984; --grid:#ebeae6;
+  --accent:#2a78d6;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948;
+  --good:#1f8a4c; --bad:#c8372d;
+  --seq: #cde2fb,#b7d3f6,#9ec5f4,#86b6ef,#6da7ec,#5598e7,#3987e5,#2a78d6,#256abf,#1c5cab,#184f95,#104281,#0d366b;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#111110; --surface:#1a1a19; --surface-2:#232321; --border:#2f2f2c;
+    --text:#f0efec; --text-2:#c3c2b7; --muted:#8f8e86; --grid:#2a2a27;
+    --accent:#3987e5;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+    --good:#4cc27e; --bad:#ef6a5f;
+    --seq: #1d2a3a,#1a3350,#183d66,#184f95,#1c5cab,#256abf,#2a78d6,#3987e5,#5598e7,#6da7ec,#86b6ef,#9ec5f4,#b7d3f6;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#111110; --surface:#1a1a19; --surface-2:#232321; --border:#2f2f2c;
+  --text:#f0efec; --text-2:#c3c2b7; --muted:#8f8e86; --grid:#2a2a27;
+  --accent:#3987e5;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  --good:#4cc27e; --bad:#ef6a5f;
+  --seq: #1d2a3a,#1a3350,#183d66,#184f95,#1c5cab,#256abf,#2a78d6,#3987e5,#5598e7,#6da7ec,#86b6ef,#9ec5f4,#b7d3f6;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:18px 24px 6px}
+header h1{margin:0;font-size:20px;font-weight:650;letter-spacing:-.01em}
+header .sub{color:var(--text-2);font-size:13px}
+.hbtns{display:flex;gap:8px;flex-wrap:wrap}
+button,.btn{font:inherit;font-size:13px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:hover,.btn:hover{border-color:var(--muted)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+main{padding:8px 24px 40px;display:grid;gap:16px}
+main>*,.row>*,.fgroup>*{min-width:0}
+@media (max-width:560px){main,header{padding-left:16px;padding-right:16px}.fgroup>label{width:100%;padding-top:0}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px}
+.card h2{margin:0 0 2px;font-size:15px;font-weight:620}
+.card .hint{color:var(--muted);font-size:12px;margin-bottom:10px}
+.row{display:grid;gap:16px}
+.r2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.r3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:1000px){.r2,.r3{grid-template-columns:1fr}}
+/* filtros */
+.filters{display:grid;gap:10px}
+.fgroup{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.fgroup>label{width:96px;flex:none;color:var(--text-2);font-size:12px;font-weight:600;padding-top:5px;text-transform:uppercase;letter-spacing:.04em}
+.chips{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:0}
+.chip{border:1px solid var(--border);background:var(--surface);color:var(--text-2);border-radius:999px;padding:3px 10px;font-size:12.5px;cursor:pointer;user-select:none;display:inline-flex;gap:6px;align-items:center}
+.chip .n{color:var(--muted);font-size:11px}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip.on .n{color:#ffffffc0}
+.chip .dot{width:8px;height:8px;border-radius:50%}
+select,input[type=search]{font:inherit;font-size:13px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:5px 8px;max-width:100%}
+.factions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.active-sum{color:var(--text-2);font-size:12.5px}
+/* kpis */
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi .lb{color:var(--text-2);font-size:12px}
+.kpi .v{font-size:26px;font-weight:650;letter-spacing:-.02em;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .v.sm{font-size:16px;line-height:1.3;margin-top:6px}
+.kpi .d{font-size:12px;color:var(--muted);margin-top:2px}
+.up{color:var(--bad)} .down{color:var(--good)}
+.chartbox{position:relative;height:300px}
+.chartbox.tall{height:440px}
+/* tabelas */
+.tablewrap{overflow:auto;max-height:520px;border:1px solid var(--border);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--grid);text-align:left;vertical-align:top}
+th{position:sticky;top:0;background:var(--surface-2);color:var(--text-2);font-weight:600;font-size:12px;cursor:pointer;white-space:nowrap}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr:hover td{background:var(--surface-2)}
+.tag{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:999px;background:var(--surface-2);color:var(--text-2);margin:1px 2px 1px 0;white-space:nowrap}
+.heat td{text-align:center;font-variant-numeric:tabular-nums;min-width:44px}
+.heat td.rh,.heat th.rh{text-align:left;white-space:nowrap}
+.heat td.cell{cursor:pointer}
+.heat td.tot{font-weight:600;color:var(--text-2)}
+.ctl{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:13px;color:var(--text-2)}
+.cmpgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:700px){.cmpgrid{grid-template-columns:1fr}}
+.cmpgrid select[multiple]{width:100%;min-height:140px}
+.grp{font-size:12px;font-weight:650;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+.cmpk{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:12px 0}
+@media (max-width:900px){.cmpk{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cmpk .kpi{padding:10px 12px}
+.cmpk .pair{display:flex;justify-content:space-between;gap:6px;font-variant-numeric:tabular-nums;margin-top:4px}
+.cmpk .pair b{font-size:18px}
+#drop{display:none;margin:40px auto;max-width:560px;text-align:center;padding:40px;border:2px dashed var(--border);border-radius:16px;background:var(--surface)}
+#drop.show{display:block}
+#drop.over{border-color:var(--accent)}
+.prof-panel{display:none}
+.prof-panel.show{display:block}
+.empty{color:var(--muted);padding:20px;text-align:center}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--text-2);margin:-4px 0 8px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Pacientes que saíram — análise por profissional</h1>
+    <div class="sub" id="fonte">Carregando base…</div>
+  </div>
+  <div class="hbtns">
+    <label class="btn" title="Carregar outra planilha (.xlsx)">Trocar planilha<input type="file" id="file" accept=".xlsx,.xls,.csv" hidden></label>
+    <button id="reload" title="Recarregar base.xlsx da pasta">Recarregar base</button>
+    <button id="theme" title="Alternar tema">Tema</button>
+  </div>
+</header>
+
+<div id="drop">
+  <h2 style="margin-top:0">Carregue a planilha</h2>
+  <p style="color:var(--text-2)">Não consegui ler <b>base.xlsx</b> automaticamente (o arquivo foi aberto direto, sem o <b>iniciar.bat</b>).<br>Arraste a planilha aqui ou clique para escolher.</p>
+  <label class="btn primary" style="background:var(--accent);color:#fff;border-color:var(--accent)">Escolher planilha<input type="file" id="file2" accept=".xlsx,.xls,.csv" hidden></label>
+</div>
+
+<main id="app" hidden>
+  <section class="card filters" id="filters">
+    <div class="fgroup"><label>Mês</label><div class="chips" id="f-mes"></div></div>
+    <div class="fgroup"><label>Convênio</label><div class="chips" id="f-conv"></div></div>
+    <div class="fgroup"><label>Especialidade</label><div class="chips" id="f-esp"></div></div>
+    <div class="fgroup"><label>Motivo</label><div class="chips" id="f-mot"></div></div>
+    <div class="fgroup"><label>Profissional</label>
+      <div class="factions" style="flex:1">
+        <select id="f-prof" style="min-width:240px"><option value="">Todos</option></select>
+        <input type="search" id="f-busca" placeholder="Buscar paciente, profissional ou observação…" style="flex:1;min-width:200px">
+        <button id="clear">Limpar filtros</button>
+        <span class="active-sum" id="fsum"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="card prof-panel" id="profPanel"></section>
+
+  <div class="row r2">
+    <section class="card">
+      <h2>Saídas por mês</h2>
+      <div class="hint">Empilhado por categoria de motivo · clique numa barra para filtrar o mês</div>
+      <div class="legend" id="legMot"></div>
+      <div class="chartbox"><canvas id="cMes"></canvas></div>
+    </section>
+    <section class="card">
+      <h2>Motivos de saída</h2>
+      <div class="hint">Categorias agrupadas a partir da coluna OBSERVAÇÕES · clique para filtrar</div>
+      <div class="chartbox"><canvas id="cMot"></canvas></div>
+    </section>
+  </div>
+
+  <div class="row r2">
+    <section class="card">
+      <h2>Saídas por convênio</h2>
+      <div class="hint">Clique para filtrar</div>
+      <div class="chartbox"><canvas id="cConv"></canvas></div>
+    </section>
+    <section class="card">
+      <h2>Saídas por especialidade</h2>
+      <div class="hint">Um paciente conta em cada especialidade que fazia · clique para filtrar</div>
+      <div class="chartbox"><canvas id="cEsp"></canvas></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Ranking de profissionais</h2>
+    <div class="ctl">
+      <span>Mostrar</span>
+      <select id="rkN"><option>10</option><option selected>15</option><option>25</option><option>40</option></select>
+      <span>profissionais · ordenar por</span>
+      <select id="rkSort"><option value="n">nº de saídas</option><option value="f">% por faltas</option></select>
+      <span style="color:var(--muted)">· clique numa barra para abrir o profissional</span>
+    </div>
+    <div class="legend" id="legEsp"></div>
+    <div class="chartbox tall"><canvas id="cProf"></canvas></div>
+  </section>
+
+  <section class="card">
+    <h2>Mapa de calor cruzado</h2>
+    <div class="ctl">
+      <span>Linhas</span><select id="hmR"></select>
+      <span>Colunas</span><select id="hmC"></select>
+      <span style="color:var(--muted)">· clique numa célula para filtrar as duas dimensões</span>
+    </div>
+    <div class="tablewrap" style="max-height:none"><table class="heat" id="heat"></table></div>
+  </section>
+
+  <section class="card" id="cmp">
+    <h2>Comparativo A × B</h2>
+    <div class="hint">Os filtros acima continuam valendo, exceto o da dimensão que está sendo comparada.</div>
+    <div class="ctl">
+      <span>Comparar por</span><select id="cmpDim"></select>
+      <span>detalhar por</span><select id="cmpBy"></select>
+      <span>exibir</span><select id="cmpMode"><option value="abs">valores absolutos</option><option value="pct">% do grupo</option></select>
+    </div>
+    <div class="cmpgrid">
+      <div><div class="grp"><span class="sw" style="background:var(--s1)"></span>Grupo A <span style="color:var(--muted);font-weight:400">(Ctrl+clique para vários)</span></div><select multiple id="cmpA"></select></div>
+      <div><div class="grp"><span class="sw" style="background:var(--s2)"></span>Grupo B</div><select multiple id="cmpB"></select></div>
+    </div>
+    <div class="cmpk" id="cmpK"></div>
+    <div class="row r2">
+      <div class="chartbox tall"><canvas id="cCmp"></canvas></div>
+      <div class="tablewrap" style="max-height:440px"><table id="cmpT"></table></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Registros <span id="nreg" style="color:var(--muted);font-weight:400"></span></h2>
+    <div class="ctl"><button id="csv">Exportar CSV (filtrado)</button><span style="color:var(--muted)">Clique no cabeçalho para ordenar</span></div>
+    <div class="tablewrap"><table id="tbl"></table></div>
+  </section>
+</main>
+
+<script>
+/* ============ CONFIGURAÇÃO (ajuste aqui se precisar) ============ */
+const BASE_FILE = 'base.xlsx';
+const MESES = ['JANEIRO','FEVEREIRO','MARCO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
+const MES_LABEL = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+// Correções de grafia de convênio (chave = texto sem acento, maiúsculo)
+const CONV_ALIAS = { 'ASSEZAZ':'ASSEFAZ', 'PORTO SAUDE':'PORTO SAÚDE' };
+// Correções de grafia de profissionais (aplicadas antes da fusão automática por sobrenome)
+const PROF_ALIAS = {
+  'LUTTIENY':'LUTTIENNY','SAMILLA':'SAMILA','SAMILLA FERNANDES':'SAMILA FERNANDES','LUDYMILA':'LUDMYLA',
+  'LUIZ FELIPE':'LUIZ FILIPE','CAIO FILLIPE':'CAIO FILIPE','LARISSA ELEN':'LARISSA ELLEN','FRANCIELENE':'FRANCILENE',
+  'GUSTAVO KHALL':'GUSTAVO KHALIL','MAUJRO JUNIOR':'MAURO JUNIOR','BIANA':'BIANCA','THALYSSON':'THALYSON',
+  'BETARIZ KAROLINE':'BEATRIZ KAROLINA','ANA BETARIZ':'ANA BEATRIZ','JESSICA DA SILA':'JESSICA DA SILVA',
+  'NATHALIA GABIRELE':'NATHALIA GABRIELE','STEPHANYE':'STEPHANY','STEPHANNY':'STEPHANY','MIRIAM':'MIRIAN',
+  'GIOVANA DE CARVALHO':'GIOVANNA DE CARVALHO','GIOVANA CARVALHO':'GIOVANNA DE CARVALHO','AMANDA OLIVEIRA':'AMANDA DE OLIVEIRA',
+  'MATHEUS B':'MATHEUS BEZERRA','SARAH CARNEIRO':'SARA CARNEIRO','PAMELA  PEREIRA':'PAMELA PEREIRA','LETICIA ESTEFANY':'LETICIA ESTEFANY'
+};
+// Categorias de motivo: a primeira regra que casar com a OBSERVAÇÃO vence (texto sem acento, maiúsculo)
+const MOTIVOS = [
+  ['Faltas / ausências',      /FALTA|AUSENCIA|SEM RETORNO/],
+  ['Insatisfação / adaptação',/INSATISF|RECLAMA|PROBLEMA COM O PROFISSIONAL|ADAPTOU|NAO FORAM ADEQUADOS|RELACIONADOS AO CLINICO/],
+  ['Convênio / plano',        /CONVENIO|PLANO|ELEGI|AMIL/],
+  ['Mudança de clínica',      /(MUDANCA|TROCA|MUDOU)( DE ENDERECO E)? DE CLINICA|TERAPEUTA PARTICULAR/],
+  ['Logística / rotina',      /ENDERECO|CIDADE|DISTAN|LOCALIZA|DESLOCAMENTO|ROTINA|HORARIO|VIAJANDO|NAO PODER TRAZER/],
+  ['Outros',                  /\bALTA\b|18 ANOS|ATESTADO|MOTIVOS DE SAUDE|DESREGULANDO|FINANCEIR|PAGAMENTO|PEDIDO|DESLIGADO/],
+  ['Não informado',           /NAO INFORM|NAO QUIS INFORMAR|FORMALIZADO PELA RECEP|FORMALIZADO POR E-?MAIL|^AGENDA DISPONIBILIZADA$|^$/],
+  ['Decisão da família',      /SOLICIT|RESPONSAVEL|MAE|PESSOA|CONTINUIDADE|PAUSA/],
+];
+const MOT_ORDER = ['Faltas / ausências','Convênio / plano','Decisão da família','Logística / rotina','Mudança de clínica','Insatisfação / adaptação','Não informado','Outros'];
+const FALTAS = 'Faltas / ausências';
+const ESP_ABREV = e => ({'PSICOLOGIA':'Psico','TERAPIA OCUPACIONAL':'TO','FONOAUDIOLOGIA':'Fono','FISIOTERAPIA':'Fisio','PSICOMOTRICIDADE':'Psicomot','NUTRICAO':'Nutri','MUSICA':'Música','PSICOPEDAGOGIA':'Psicoped'})[norm(e)] || e.slice(0,6);
+/* ================================================================ */
+
+const strip = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g,'');
+const norm = s => strip(s).toUpperCase().replace(/\s+/g,' ').trim();
+const LOWER = new Set(['DE','DA','DO','DOS','DAS','E']);
+const title = s => s.split(' ').map((w,i)=> i && LOWER.has(w) ? w.toLowerCase() : w.charAt(0)+w.slice(1).toLowerCase()).join(' ');
+const fmt = n => n.toLocaleString('pt-BR');
+const pct = (a,b) => b ? (100*a/b) : 0;
+const fmtP = v => v.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const SERIES = () => [1,2,3,4,5,6,7,8].map(i=>css('--s'+i));
+const motColor = m => SERIES()[MOT_ORDER.indexOf(m)] || css('--muted');
+
+let DATA = [], META = {};
+const F = { mes:new Set(), conv:new Set(), esp:new Set(), mot:new Set(), prof:'', busca:'' };
+const charts = {};
+
+/* ------------------------- leitura ------------------------- */
+function categorizar(obs){
+  const t = norm(obs);
+  for (const [cat, re] of MOTIVOS) if (re.test(t)) return cat;
+  return 'Outros';
+}
+function parseWorkbook(wb, fonte){
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
+  const hi = rows.findIndex(r => r.some(c => norm(c) === 'PACIENTES' || norm(c) === 'PACIENTE'));
+  if (hi < 0) throw new Error('Não encontrei a coluna PACIENTES na primeira aba.');
+  const head = rows[hi].map(c => String(c).trim());
+  const H = head.map(norm);
+  const ix = k => H.findIndex(h => h.startsWith(k));
+  const iPac = ix('PACIENTE'), iConv = ix('CONVENIO'), iMes = ix('MES'), iObs = ix('OBSERVA'), iCat = H.findIndex(h=>h.includes('CATEGORIA'));
+  const espCols = head.map((h,i)=>({h,i})).filter(o => o.h && ![iPac,iConv,iMes,iObs,iCat].includes(o.i));
+  const espNames = espCols.map(o => title(norm(o.h)).replace('Nutricao','Nutrição').replace('Musica','Música').replace('Terapia Ocupacional','Terapia Ocupacional'));
+
+  // 1) tokens brutos por especialidade
+  const recs = [];
+  for (const r of rows.slice(hi+1)){
+    const pac = String(r[iPac]||'').trim();
+    if (!pac) continue;
+    const convN = norm(r[iConv]);
+    const conv = CONV_ALIAS[convN] || r[iConv].toString().trim().toUpperCase() || 'NÃO INFORMADO';
+    const mesN = norm(r[iMes]);
+    const mi = MESES.indexOf(mesN);
+    const obs = String(r[iObs]||'').replace(/\s+/g,' ').trim();
+    const profs = [];
+    espCols.forEach((o,k) => {
+      String(r[o.i]||'').split(/\s*[-\/;,]\s*/).forEach(tok => {
+        let n = norm(tok).replace(/\.+$/,'').trim();
+        if (n.length < 2) return;
+        n = PROF_ALIAS[n] || n;
+        profs.push({esp: espNames[k], raw: n});
+      });
+    });
+    recs.push({pac: title(norm(pac)), conv: conv, mes: mi, mesTxt: mi>=0 ? MES_LABEL[mi] : (mesN||'—'), obs, mot: iCat>=0 && String(r[iCat]).trim() ? String(r[iCat]).trim() : categorizar(obs), profs});
+  }
+  // 2) fusão automática: "GUSTAVO" -> "GUSTAVO KHALIL" quando só existe um nome completo compatível na mesma especialidade
+  const byEsp = {};
+  recs.forEach(r => r.profs.forEach(p => (byEsp[p.esp] ??= new Set()).add(p.raw)));
+  const canon = {};
+  for (const [esp, set] of Object.entries(byEsp)){
+    const names = [...set].sort((a,b)=>b.length-a.length);
+    for (const n of names){
+      const longer = names.filter(m => m.startsWith(n+' ')).map(m => canon[esp+'|'+m] || m);
+      const uniq = [...new Set(longer)];
+      canon[esp+'|'+n] = uniq.length === 1 ? uniq[0] : n;
+    }
+  }
+  recs.forEach((r,id) => {
+    r.id = id;
+    const seen = new Set();
+    r.profs = r.profs.map(p => ({esp:p.esp, nome:title(canon[p.esp+'|'+p.raw])}))
+      .map(p => ({...p, key:p.esp+'|'+p.nome}))
+      .filter(p => !seen.has(p.key) && seen.add(p.key));
+    r.esps = [...new Set(r.profs.map(p=>p.esp))];
+    r.convL = r.conv;
+  });
+  DATA = recs;
+  META = {
+    fonte, espNames,
+    meses: [...new Set(recs.map(r=>r.mes))].sort((a,b)=>a-b),
+    convs: count(recs, r=>[r.convL]),
+    esps: espNames,
+    mots: MOT_ORDER.filter(m => recs.some(r=>r.mot===m)).concat([...new Set(recs.map(r=>r.mot))].filter(m=>!MOT_ORDER.includes(m))),
+    profs: [...new Map(recs.flatMap(r=>r.profs).map(p=>[p.key,p])).values()].sort((a,b)=>a.esp.localeCompare(b.esp)||a.nome.localeCompare(b.nome))
+  };
+  boot();
+}
+function count(list, keysFn){
+  const m = new Map();
+  list.forEach(r => keysFn(r).forEach(k => m.set(k,(m.get(k)||0)+1)));
+  return [...m.entries()].sort((a,b)=>b[1]-a[1]);
+}
+function loadBuffer(buf, fonte){
+  try { parseWorkbook(XLSX.read(buf, {type:'array'}), fonte); }
+  catch(e){ alert('Erro ao ler a planilha: '+e.message); console.error(e); }
+}
+async function loadBase(){
+  try{
+    const res = await fetch(BASE_FILE+'?t='+Date.now(), {cache:'no-store'});
+    if(!res.ok) throw 0;
+    loadBuffer(await res.arrayBuffer(), BASE_FILE);
+  }catch(e){
+    document.getElementById('drop').classList.add('show');
+    document.getElementById('fonte').textContent = 'Nenhuma base carregada';
+  }
+}
+function onFile(ev){
+  const f = ev.target.files[0]; if(!f) return;
+  f.arrayBuffer().then(b => loadBuffer(b, f.name));
+  ev.target.value = '';
+}
+
+/* ------------------------- filtros ------------------------- */
+function matches(r, skip){
+  if (skip!=='mes'  && F.mes.size  && !F.mes.has(r.mes)) return false;
+  if (skip!=='conv' && F.conv.size && !F.conv.has(r.convL)) return false;
+  if (skip!=='esp'  && F.esp.size  && !r.esps.some(e=>F.esp.has(e))) return false;
+  if (skip!=='mot'  && F.mot.size  && !F.mot.has(r.mot)) return false;
+  if (skip!=='prof' && F.prof && !r.profs.some(p=>p.key===F.prof)) return false;
+  if (F.busca){
+    const q = norm(F.busca);
+    const hay = norm([r.pac, r.convL, r.obs, r.mot, ...r.profs.map(p=>p.nome)].join(' '));
+    if (!hay.includes(q)) return false;
+  }
+  return true;
+}
+const filtered = skip => DATA.filter(r => matches(r, skip));
+function toggle(set, v){ set.has(v) ? set.delete(v) : set.add(v); render(); }
+
+function renderChips(){
+  const mk = (el, items, set, key, colorFn) => {
+    const base = filtered(key);
+    document.getElementById(el).innerHTML = items.map(([v,label]) => {
+      const n = base.filter(r => key==='esp' ? r.esps.includes(v) : (key==='mes'?r.mes:key==='conv'?r.convL:r.mot)===v).length;
+      const dot = colorFn ? `<span class="dot" style="background:${colorFn(v)}"></span>` : '';
+      return `<span class="chip ${set.has(v)?'on':''}" data-v="${esc(v)}">${dot}${esc(label)} <span class="n">${n}</span></span>`;
+    }).join('');
+    document.getElementById(el).querySelectorAll('.chip').forEach(c => c.onclick = () => {
+      let v = c.dataset.v; if (key==='mes') v = +v; toggle(set, v);
+    });
+  };
+  mk('f-mes', META.meses.map(m=>[m, m>=0?MES_LABEL[m]:'—']), F.mes, 'mes');
+  mk('f-conv', META.convs.map(([c])=>[c,c]), F.conv, 'conv');
+  mk('f-esp', META.esps.map(e=>[e,e]), F.esp, 'esp');
+  mk('f-mot', META.mots.map(m=>[m,m]), F.mot, 'mot', motColor);
+  const sel = document.getElementById('f-prof');
+  const groups = {};
+  META.profs.forEach(p => (groups[p.esp] ??= []).push(p));
+  sel.innerHTML = '<option value="">Todos os profissionais</option>' + Object.entries(groups).map(([e,ps]) =>
+    `<optgroup label="${esc(e)}">${ps.map(p=>`<option value="${esc(p.key)}" ${p.key===F.prof?'selected':''}>${esc(p.nome)}</option>`).join('')}</optgroup>`).join('');
+  const parts = [];
+  if (F.mes.size) parts.push(F.mes.size+' mês(es)');
+  if (F.conv.size) parts.push(F.conv.size+' convênio(s)');
+  if (F.esp.size) parts.push(F.esp.size+' especialidade(s)');
+  if (F.mot.size) parts.push(F.mot.size+' motivo(s)');
+  if (F.prof) parts.push(F.prof.split('|')[1]);
+  if (F.busca) parts.push('busca "'+F.busca+'"');
+  document.getElementById('fsum').textContent = parts.length ? 'Filtrando: '+parts.join(' · ') : '';
+}
+
+/* ------------------------- métricas ------------------------- */
+function stats(list){
+  const total = list.length;
+  const unicos = new Set(list.map(r=>norm(r.pac))).size;
+  const meses = new Set(list.map(r=>r.mes)).size || 1;
+  const faltas = list.filter(r=>r.mot===FALTAS).length;
+  const mediaEsp = total ? list.reduce((s,r)=>s+r.esps.length,0)/total : 0;
+  const topMot = count(list, r=>[r.mot])[0];
+  const topConv = count(list, r=>[r.convL])[0];
+  return {total, unicos, meses, mediaMes: total/meses, faltas, pFaltas: pct(faltas,total), mediaEsp, topMot, topConv};
+}
+function renderKpis(list){
+  const s = stats(list);
+  // variação: último mês do recorte vs mês anterior
+  const ms = [...new Set(list.map(r=>r.mes))].sort((a,b)=>a-b);
+  let dTxt = '';
+  if (ms.length >= 2){
+    const a = list.filter(r=>r.mes===ms.at(-2)).length, b = list.filter(r=>r.mes===ms.at(-1)).length;
+    const d = b-a, cls = d>0?'up':d<0?'down':'';
+    dTxt = `<span class="${cls}">${d>0?'▲':d<0?'▼':'='} ${Math.abs(d)}</span> ${MES_LABEL[ms.at(-1)]} vs ${MES_LABEL[ms.at(-2)]}`;
+  }
+  const k = (lb,v,d='',sm=false) => `<div class="kpi"><div class="lb">${lb}</div><div class="v ${sm?'sm':''}">${v}</div><div class="d">${d}</div></div>`;
+  document.getElementById('kpis').innerHTML =
+    k('Saídas', fmt(s.total), dTxt || '&nbsp;') +
+    k('Pacientes únicos', fmt(s.unicos), s.total-s.unicos ? `${s.total-s.unicos} com mais de um registro` : '&nbsp;') +
+    k('Média por mês', s.mediaMes.toLocaleString('pt-BR',{maximumFractionDigits:1}), `${s.meses} mês(es) no recorte`) +
+    k('Por faltas', fmtP(s.pFaltas), `${fmt(s.faltas)} saídas`) +
+    k('Especialidades / paciente', s.mediaEsp.toLocaleString('pt-BR',{maximumFractionDigits:1}), 'média de terapias por saída') +
+    k('Principal motivo', s.topMot ? esc(s.topMot[0]) : '—', s.topConv ? `Convênio líder: ${esc(s.topConv[0])} (${s.topConv[1]})` : '', true);
+}
+
+/* ------------------------- gráficos ------------------------- */
+function baseOpts(horizontal, onPick){
+  const grid = css('--grid'), txt = css('--text-2');
+  return {
+    responsive:true, maintainAspectRatio:false, indexAxis: horizontal?'y':'x',
+    animation:{duration:250},
+    plugins:{ legend:{display:false},
+      tooltip:{backgroundColor:css('--surface'), titleColor:css('--text'), bodyColor:css('--text-2'), borderColor:css('--border'), borderWidth:1, padding:10, cornerRadius:8, boxPadding:4} },
+    scales:{
+      x:{grid:{color: horizontal?grid:'transparent'}, ticks:{color:txt, precision:0}, border:{display:false}},
+      y:{grid:{color: horizontal?'transparent':grid}, ticks:{color:txt, precision:0, autoSkip:false}, border:{display:false}}
+    },
+    onClick:(e, els, chart) => { if (els.length && onPick) onPick(els[0], chart); },
+    onHover:(e, els) => { e.native.target.style.cursor = els.length && onPick ? 'pointer' : 'default'; }
+  };
+}
+const barDs = (data, color, label) => ({label, data, backgroundColor:color, borderRadius:4, borderSkipped:'start', maxBarThickness:22, borderColor:css('--surface'), borderWidth:{top:0,bottom:0,left:0,right:0}});
+function draw(id, cfg){ charts[id]?.destroy(); charts[id] = new Chart(document.getElementById(id), cfg); }
+const valueLabels = {
+  id:'valueLabels',
+  afterDatasetsDraw(chart){
+    if (chart.config.options.indexAxis !== 'y' || chart.data.datasets.length !== 1) return;
+    const {ctx} = chart; ctx.save();
+    ctx.fillStyle = css('--text-2'); ctx.font = '12px "Segoe UI",system-ui'; ctx.textBaseline='middle';
+    const meta = chart.getDatasetMeta(0);
+    meta.data.forEach((bar,i) => { const v = chart.data.datasets[0].data[i]; const lab = chart.data.datasets[0].labelsFmt?.[i] ?? v; ctx.fillText(lab, bar.x+6, bar.y); });
+    ctx.restore();
+  }
+};
+Chart.register(valueLabels);
+
+function hbar(id, entries, colorFn, onPick, fmtFn){
+  const el = document.getElementById(id).parentElement;
+  el.style.height = Math.max(160, entries.length*28+40)+'px';
+  const ds = barDs(entries.map(e=>e[1]), entries.map(e=>colorFn(e[0])), 'Saídas');
+  if (fmtFn) ds.labelsFmt = entries.map(fmtFn);
+  const o = baseOpts(true, onPick);
+  o.layout = {padding:{right:56}};
+  draw(id, {type:'bar', data:{labels:entries.map(e=>e[0]), datasets:[ds]}, options:o});
+}
+
+function renderCharts(list){
+  const s1 = css('--s1');
+  // por mês, empilhado por motivo
+  const ms = META.meses;
+  const mots = META.mots.filter(m => list.some(r=>r.mot===m));
+  document.getElementById('legMot').innerHTML = mots.map(m=>`<span><span class="sw" style="background:${motColor(m)}"></span>${esc(m)}</span>`).join('');
+  const o = baseOpts(false, (el) => toggle(F.mes, ms[el.index]));
+  o.scales.x.stacked = o.scales.y.stacked = true;
+  o.plugins.tooltip.mode = 'index'; o.plugins.tooltip.filter = i => i.raw > 0;
+  o.plugins.tooltip.callbacks = { footer: items => 'Total: '+items.reduce((s,i)=>s+i.raw,0) };
+  draw('cMes', {type:'bar', data:{
+    labels: ms.map(m=>MES_LABEL[m]||'—'),
+    datasets: mots.map(m => ({...barDs(ms.map(mi => list.filter(r=>r.mes===mi && r.mot===m).length), motColor(m), m), borderRadius:0, borderSkipped:false, borderWidth:{top:2,bottom:0,left:0,right:0}}))
+  }, options:o});
+
+  const tot = list.length;
+  const pf = e => `${e[1]}  (${fmtP(pct(e[1],tot))})`;
+  hbar('cMot', count(list, r=>[r.mot]).sort((a,b)=>MOT_ORDER.indexOf(a[0])-MOT_ORDER.indexOf(b[0])), motColor, el => toggle(F.mot, charts.cMot.data.labels[el.index]), pf);
+  hbar('cConv', count(list, r=>[r.convL]), ()=>s1, el => toggle(F.conv, charts.cConv.data.labels[el.index]), pf);
+  hbar('cEsp', count(list, r=>r.esps), ()=>s1, el => toggle(F.esp, charts.cEsp.data.labels[el.index]), pf);
+
+  // ranking de profissionais (respeita filtro de especialidade)
+  const N = +document.getElementById('rkN').value, sortBy = document.getElementById('rkSort').value;
+  const pm = new Map();
+  list.forEach(r => r.profs.forEach(p => {
+    if (F.esp.size && !F.esp.has(p.esp)) return;
+    const o = pm.get(p.key) || {p, n:0, f:0}; o.n++; if (r.mot===FALTAS) o.f++; pm.set(p.key, o);
+  }));
+  let rk = [...pm.values()];
+  rk.sort(sortBy==='f' ? (a,b)=> (b.f/b.n - a.f/a.n) || b.n-a.n : (a,b)=> b.n-a.n || a.p.nome.localeCompare(b.p.nome));
+  if (sortBy==='f') rk = rk.filter(x=>x.n>=3);
+  rk = rk.slice(0,N);
+  const box = document.getElementById('cProf').parentElement;
+  box.style.height = Math.max(200, rk.length*28+40)+'px';
+  const espIdx = e => META.espNames.indexOf(e);
+  document.getElementById('legEsp').innerHTML = META.espNames.filter(e=>rk.some(x=>x.p.esp===e)).map(e=>`<span><span class="sw" style="background:${SERIES()[espIdx(e)%8]}"></span>${esc(e)}</span>`).join('');
+  const op = baseOpts(true, el => { F.prof = rk[el.index].p.key; render(); document.getElementById('profPanel').scrollIntoView({behavior:'smooth', block:'start'}); });
+  op.layout = {padding:{right:120}};
+  op.plugins.tooltip.callbacks = { label: i => { const x = rk[i.dataIndex]; return [`${x.n} saídas`, `${x.f} por faltas (${fmtP(pct(x.f,x.n))})`]; }, title: i => `${rk[i[0].dataIndex].p.nome} — ${rk[i[0].dataIndex].p.esp}` };
+  const ds = barDs(rk.map(x=> sortBy==='f' ? +(pct(x.f,x.n)).toFixed(1) : x.n), rk.map(x=>SERIES()[espIdx(x.p.esp)%8]), 'Saídas');
+  ds.labelsFmt = rk.map(x => sortBy==='f' ? `${fmtP(pct(x.f,x.n))} de ${x.n}` : `${x.n} · ${fmtP(pct(x.f,x.n))} faltas`);
+  draw('cProf', {type:'bar', data:{labels: rk.map(x=>`${x.p.nome} (${x.p.esp})`), datasets:[ds]}, options:op});
+}
+
+/* ------------------------- mapa de calor ------------------------- */
+const DIMS = {
+  mes:  {label:'Mês', keys:r=>[r.mes], all:()=>META.meses, show:k=>MES_LABEL[k]||'—', filt:'mes'},
+  conv: {label:'Convênio', keys:r=>[r.convL], all:()=>META.convs.map(c=>c[0]), show:k=>k, filt:'conv'},
+  esp:  {label:'Especialidade', keys:r=>r.esps, all:()=>META.esps, show:k=>k, filt:'esp'},
+  mot:  {label:'Motivo', keys:r=>[r.mot], all:()=>META.mots, show:k=>k, filt:'mot'},
+  prof: {label:'Profissional', keys:r=>r.profs.map(p=>p.key), all:()=>META.profs.map(p=>p.key), show:k=>{const [e,n]=k.split('|'); return `${n} (${e})`;}, filt:'prof'},
+};
+function seqColor(t){
+  const steps = css('--seq').split(',').map(s=>s.trim());
+  return steps[Math.min(steps.length-1, Math.round(t*(steps.length-1)))];
+}
+function applyDimFilter(dim, key){
+  if (dim==='prof') F.prof = F.prof===key ? '' : key;
+  else { const set = F[DIMS[dim].filt]; set.clear(); set.add(key); }
+}
+function renderHeat(list){
+  const R = document.getElementById('hmR').value, C = document.getElementById('hmC').value;
+  const dr = DIMS[R], dc = DIMS[C];
+  const m = new Map(), rt = new Map(), ct = new Map();
+  list.forEach(r => dr.keys(r).forEach(a => dc.keys(r).forEach(b => {
+    const k = a+'¦'+b; m.set(k,(m.get(k)||0)+1);
+  })));
+  list.forEach(r => { dr.keys(r).forEach(a=>rt.set(a,(rt.get(a)||0)+1)); dc.keys(r).forEach(b=>ct.set(b,(ct.get(b)||0)+1)); });
+  let rows = dr.all().filter(k=>rt.get(k)); let cols = dc.all().filter(k=>ct.get(k));
+  if (R!=='mes') rows.sort((a,b)=>rt.get(b)-rt.get(a));
+  if (C!=='mes') cols.sort((a,b)=>ct.get(b)-ct.get(a));
+  if (R==='prof') rows = rows.slice(0,30);
+  if (C==='prof') cols = cols.slice(0,20);
+  const max = Math.max(1,...m.values());
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme!=='light' || document.documentElement.dataset.theme==='dark';
+  let h = `<tr><th class="rh">${dr.label} \\ ${dc.label}</th>${cols.map(c=>`<th class="num">${esc(dc.show(c))}</th>`).join('')}<th class="num">Total</th></tr>`;
+  rows.forEach(a => {
+    h += `<tr><td class="rh">${esc(dr.show(a))}</td>` + cols.map(b => {
+      const v = m.get(a+'¦'+b)||0; if (!v) return `<td class="cell" style="color:var(--muted)">·</td>`;
+      const t = v/max, bg = seqColor(t*0.85+0.1);
+      const tt = t*0.85+0.1, fg = dark ? (tt>0.55 ? '#0b0b0b' : '#fff') : (tt>0.5 ? '#fff' : '#0b0b0b');
+      return `<td class="cell" data-a="${esc(a)}" data-b="${esc(b)}" style="background:${bg};color:${fg}" title="${esc(dr.show(a))} · ${esc(dc.show(b))}: ${v}">${v}</td>`;
+    }).join('') + `<td class="tot num">${rt.get(a)}</td></tr>`;
+  });
+  if (!rows.length) h += `<tr><td class="empty" colspan="99">Sem dados no recorte</td></tr>`;
+  const T = document.getElementById('heat'); T.innerHTML = h;
+  T.querySelectorAll('td.cell[data-a]').forEach(td => td.onclick = () => {
+    const cast = (d,v) => d==='mes' ? +v : v;
+    if (R===C) return;
+    applyDimFilter(R, cast(R, td.dataset.a)); applyDimFilter(C, cast(C, td.dataset.b)); render();
+  });
+}
+
+/* ------------------------- comparativo ------------------------- */
+let cmpInit = '';
+function cmpOptions(){
+  const dim = document.getElementById('cmpDim').value;
+  if (cmpInit === dim) return;
+  cmpInit = dim;
+  const d = DIMS[dim], all = d.all();
+  const opts = all.map(k => `<option value="${esc(k)}">${esc(d.show(k))}</option>`).join('');
+  const A = document.getElementById('cmpA'), B = document.getElementById('cmpB');
+  A.innerHTML = B.innerHTML = opts;
+  // padrões sensatos
+  if (dim==='mes'){ const h = Math.ceil(all.length/2); [...A.options].forEach((o,i)=>o.selected = i<h); [...B.options].forEach((o,i)=>o.selected = i>=h); }
+  else { if (A.options[0]) A.options[0].selected = true; if (B.options[1]) B.options[1].selected = true; }
+  const by = document.getElementById('cmpBy');
+  by.innerHTML = Object.entries(DIMS).filter(([k])=>k!==dim).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
+  by.value = dim==='mot' ? 'conv' : 'mot';
+}
+function renderCmp(){
+  cmpOptions();
+  const dim = document.getElementById('cmpDim').value, by = document.getElementById('cmpBy').value, mode = document.getElementById('cmpMode').value;
+  const d = DIMS[dim], db = DIMS[by];
+  const cast = v => dim==='mes' ? +v : v;
+  const sa = new Set([...document.getElementById('cmpA').selectedOptions].map(o=>cast(o.value)));
+  const sb = new Set([...document.getElementById('cmpB').selectedOptions].map(o=>cast(o.value)));
+  const base = filtered(d.filt);
+  const ga = base.filter(r => d.keys(r).some(k=>sa.has(k)));
+  const gb = base.filter(r => d.keys(r).some(k=>sb.has(k)));
+  const A = stats(ga), B = stats(gb);
+  const nameOf = s => { const a=[...s]; if (!a.length) return '—'; if (a.length<=3) return a.map(d.show).join(', '); if (dim==='mes'){ a.sort((x,y)=>x-y); return d.show(a[0])+'–'+d.show(a.at(-1)); } return a.length+' selecionados'; };
+  const delta = (a,b,isPct,invert) => { const dd = b-a; if (!dd) return '<span>=</span>'; const cls = (invert? dd<0:dd>0)?'up':'down'; return `<span class="${cls}">${dd>0?'▲':'▼'} ${isPct? Math.abs(dd).toLocaleString('pt-BR',{maximumFractionDigits:1})+' p.p.' : Math.abs(dd).toLocaleString('pt-BR',{maximumFractionDigits:1})}</span>`; };
+  const k = (lb,a,b,dl) => `<div class="kpi"><div class="lb">${lb}</div><div class="pair"><b style="color:var(--text)">${a}</b><b style="color:var(--text)">${b}</b></div><div class="pair d"><span>A · B</span>${dl}</div></div>`;
+  const f1 = v => v.toLocaleString('pt-BR',{maximumFractionDigits:1});
+  document.getElementById('cmpK').innerHTML =
+    k('Saídas', fmt(A.total), fmt(B.total), delta(A.total,B.total)) +
+    k(dim==='mes'?'Média por mês':'Pacientes únicos', dim==='mes'?f1(A.mediaMes):fmt(A.unicos), dim==='mes'?f1(B.mediaMes):fmt(B.unicos), dim==='mes'?delta(A.mediaMes,B.mediaMes):delta(A.unicos,B.unicos)) +
+    k('% por faltas', fmtP(A.pFaltas), fmtP(B.pFaltas), delta(A.pFaltas,B.pFaltas,true)) +
+    k('Especialidades / paciente', f1(A.mediaEsp), f1(B.mediaEsp), delta(A.mediaEsp,B.mediaEsp)) +
+    `<div class="kpi"><div class="lb">Principal motivo</div><div class="d" style="color:var(--text);margin-top:6px"><span class="sw" style="background:var(--s1)"></span> ${A.topMot?esc(A.topMot[0]):'—'}</div><div class="d" style="color:var(--text)"><span class="sw" style="background:var(--s2)"></span> ${B.topMot?esc(B.topMot[0]):'—'}</div></div>`;
+
+  const ca = new Map(count(ga, db.keys)), cb = new Map(count(gb, db.keys));
+  let keys = db.all().filter(x => ca.get(x) || cb.get(x));
+  if (by!=='mes') keys.sort((x,y)=>((cb.get(y)||0)+(ca.get(y)||0))-((cb.get(x)||0)+(ca.get(x)||0)));
+  if (by==='prof') keys = keys.slice(0,15);
+  const val = (m,x,t) => mode==='pct' ? +pct(m.get(x)||0, t).toFixed(1) : (m.get(x)||0);
+  const box = document.getElementById('cCmp').parentElement;
+  box.style.height = Math.max(240, keys.length*40+60)+'px';
+  const o = baseOpts(true, null);
+  o.plugins.legend = {display:true, position:'top', align:'start', labels:{color:css('--text-2'), boxWidth:10, boxHeight:10, useBorderRadius:true, borderRadius:3}};
+  o.plugins.tooltip.callbacks = { label: i => `${i.dataset.label}: ${mode==='pct'? fmtP(i.raw) : i.raw}` };
+  o.datasets = {bar:{categoryPercentage:.7, barPercentage:.9}};
+  draw('cCmp', {type:'bar', data:{labels: keys.map(db.show), datasets:[
+    {...barDs(keys.map(x=>val(ca,x,ga.length)), css('--s1'), 'A: '+nameOf(sa))},
+    {...barDs(keys.map(x=>val(cb,x,gb.length)), css('--s2'), 'B: '+nameOf(sb))}
+  ]}, options:o});
+
+  let h = `<tr><th>${db.label}</th><th class="num">A</th><th class="num">%A</th><th class="num">B</th><th class="num">%B</th><th class="num">Δ</th><th class="num">Δ p.p.</th></tr>`;
+  keys.forEach(x => {
+    const a = ca.get(x)||0, b = cb.get(x)||0, pa = pct(a,ga.length), pb = pct(b,gb.length), dd = b-a, dp = pb-pa;
+    h += `<tr><td>${esc(db.show(x))}</td><td class="num">${a}</td><td class="num">${fmtP(pa)}</td><td class="num">${b}</td><td class="num">${fmtP(pb)}</td><td class="num ${dd>0?'up':dd<0?'down':''}">${dd>0?'+':''}${dd}</td><td class="num ${dp>0?'up':dp<0?'down':''}">${dp>0?'+':''}${dp.toLocaleString('pt-BR',{maximumFractionDigits:1})}</td></tr>`;
+  });
+  if (!keys.length) h += `<tr><td class="empty" colspan="7">Selecione itens nos grupos A e B</td></tr>`;
+  document.getElementById('cmpT').innerHTML = h;
+}
+
+/* ------------------------- painel do profissional ------------------------- */
+function renderProf(){
+  const P = document.getElementById('profPanel');
+  if (!F.prof){ P.classList.remove('show'); return; }
+  const [esp, nome] = F.prof.split('|');
+  const mine = filtered('prof').filter(r => r.profs.some(p=>p.key===F.prof));
+  const s = stats(mine);
+  const espAll = DATA.filter(r => r.profs.some(p=>p.esp===esp && matches(r,'prof')));
+  const profsEsp = new Set(espAll.flatMap(r=>r.profs.filter(p=>p.esp===esp).map(p=>p.key))).size || 1;
+  const mediaEsp = espAll.length ? DATA.filter(r=>matches(r,'prof')).flatMap(r=>r.profs.filter(p=>p.esp===esp)).length / profsEsp : 0;
+  const sEsp = stats(espAll);
+  const mots = count(mine, r=>[r.mot]).map(([m,n])=>`<span class="tag"><span class="sw" style="background:${motColor(m)}"></span> ${esc(m)}: ${n}</span>`).join(' ');
+  const convs = count(mine, r=>[r.convL]).map(([m,n])=>`<span class="tag">${esc(m)}: ${n}</span>`).join(' ');
+  const meses = count(mine, r=>[r.mes]).sort((a,b)=>a[0]-b[0]).map(([m,n])=>`<span class="tag">${MES_LABEL[m]||'—'}: ${n}</span>`).join(' ');
+  P.innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:start">
+      <div><h2 style="font-size:17px">${esc(nome)} <span style="color:var(--muted);font-weight:400">· ${esc(esp)}</span></h2>
+      <div class="hint">Saídas de pacientes atendidos por este profissional, comparadas com a média da especialidade no mesmo recorte</div></div>
+      <button id="closeProf">Fechar profissional ✕</button>
+    </div>
+    <div class="kpis" style="grid-template-columns:repeat(4,minmax(0,1fr));margin:8px 0 12px">
+      <div class="kpi"><div class="lb">Saídas</div><div class="v">${s.total}</div><div class="d">média em ${esc(esp)}: ${mediaEsp.toLocaleString('pt-BR',{maximumFractionDigits:1})} por profissional</div></div>
+      <div class="kpi"><div class="lb">% por faltas</div><div class="v">${fmtP(s.pFaltas)}</div><div class="d">${esc(esp)}: ${fmtP(sEsp.pFaltas)}</div></div>
+      <div class="kpi"><div class="lb">Participação na especialidade</div><div class="v">${fmtP(pct(s.total, sEsp.total))}</div><div class="d">${s.total} de ${sEsp.total} saídas com ${esc(esp)}</div></div>
+      <div class="kpi"><div class="lb">Convênio mais frequente</div><div class="v sm">${s.topConv?esc(s.topConv[0]):'—'}</div><div class="d">${s.topConv?s.topConv[1]+' saídas':''}</div></div>
+    </div>
+    <div style="display:grid;gap:6px;font-size:13px">
+      <div><b style="color:var(--text-2)">Motivos:</b> ${mots||'—'}</div>
+      <div><b style="color:var(--text-2)">Meses:</b> ${meses||'—'}</div>
+      <div><b style="color:var(--text-2)">Convênios:</b> ${convs||'—'}</div>
+    </div>`;
+  P.classList.add('show');
+  document.getElementById('closeProf').onclick = () => { F.prof=''; render(); };
+}
+
+/* ------------------------- tabela ------------------------- */
+let sortCol = 'mes', sortDir = 1;
+const COLS = [
+  ['pac','Paciente', r=>r.pac],
+  ['convL','Convênio', r=>r.convL],
+  ['mes','Mês', r=>r.mes],
+  ['mot','Motivo', r=>r.mot],
+  ['esps','Especialidades', r=>r.esps.length],
+  ['profs','Profissionais', r=>r.profs.map(p=>p.nome).join(', ')],
+  ['obs','Observação', r=>r.obs],
+];
+function renderTable(list){
+  document.getElementById('nreg').textContent = `· ${list.length} de ${DATA.length}`;
+  const col = COLS.find(c=>c[0]===sortCol);
+  const rows = [...list].sort((a,b) => { const x=col[2](a), y=col[2](b); return (x>y?1:x<y?-1:0)*sortDir || a.pac.localeCompare(b.pac); });
+  let h = '<tr>'+COLS.map(([k,l])=>`<th data-k="${k}" class="${k==='esps'?'num':''}">${l}${k===sortCol?(sortDir>0?' ▲':' ▼'):''}</th>`).join('')+'</tr>';
+  rows.forEach(r => {
+    const byEsp = {}; r.profs.forEach(p => (byEsp[p.esp] ??= []).push(p.nome));
+    h += `<tr><td>${esc(r.pac)}</td><td>${esc(r.convL)}</td><td>${esc(r.mesTxt)}</td>
+      <td><span class="tag"><span class="sw" style="background:${motColor(r.mot)}"></span> ${esc(r.mot)}</span></td>
+      <td class="num">${r.esps.length}</td>
+      <td>${Object.entries(byEsp).map(([e,ns])=>`<span class="tag" title="${esc(e)}">${esc(ESP_ABREV(e))}: ${esc(ns.join(', '))}</span>`).join(' ')}</td>
+      <td style="max-width:360px">${esc(r.obs)}</td></tr>`;
+  });
+  if (!rows.length) h += `<tr><td class="empty" colspan="7">Nenhum registro com esses filtros</td></tr>`;
+  const T = document.getElementById('tbl'); T.innerHTML = h;
+  T.querySelectorAll('th').forEach(th => th.onclick = () => { const k = th.dataset.k; sortDir = sortCol===k ? -sortDir : 1; sortCol = k; renderTable(filtered()); });
+}
+function exportCsv(){
+  const list = filtered();
+  const head = ['Paciente','Convênio','Mês','Motivo (categoria)','Observação', ...META.espNames];
+  const lines = [head, ...list.map(r => [r.pac, r.convL, r.mesTxt, r.mot, r.obs, ...META.espNames.map(e => r.profs.filter(p=>p.esp===e).map(p=>p.nome).join(' / '))])];
+  const csv = '﻿'+lines.map(l => l.map(v => '"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download = 'saidas_filtrado.csv'; a.click();
+}
+
+/* ------------------------- orquestração ------------------------- */
+function render(){
+  const list = filtered();
+  renderChips(); renderKpis(list); renderProf(); renderCharts(list); renderHeat(list); renderCmp(); renderTable(list);
+}
+function boot(){
+  document.getElementById('drop').classList.remove('show');
+  document.getElementById('app').hidden = false;
+  document.getElementById('fonte').textContent = `Base: ${META.fonte} · ${DATA.length} registros · ${META.profs.length} profissionais · ${MES_LABEL[META.meses[0]]||''}–${MES_LABEL[META.meses.at(-1)]||''}`;
+  const opt = (sel, v) => Object.entries(DIMS).map(([k,d])=>`<option value="${k}" ${k===v?'selected':''}>${d.label}</option>`).join('');
+  document.getElementById('hmR').innerHTML = opt('hmR','conv');
+  document.getElementById('hmC').innerHTML = opt('hmC','mot');
+  if (!document.getElementById('cmpDim').options.length) document.getElementById('cmpDim').innerHTML = opt('cmpDim','mes');
+  cmpInit = '';
+  render();
+}
+
+document.getElementById('file').onchange = onFile;
+document.getElementById('file2').onchange = onFile;
+document.getElementById('reload').onclick = loadBase;
+document.getElementById('clear').onclick = () => { F.mes.clear(); F.conv.clear(); F.esp.clear(); F.mot.clear(); F.prof=''; F.busca=''; document.getElementById('f-busca').value=''; render(); };
+document.getElementById('f-prof').onchange = e => { F.prof = e.target.value; render(); };
+let bt; document.getElementById('f-busca').oninput = e => { clearTimeout(bt); bt = setTimeout(()=>{ F.busca = e.target.value.trim(); render(); }, 200); };
+['rkN','rkSort'].forEach(id => document.getElementById(id).onchange = () => renderCharts(filtered()));
+['hmR','hmC'].forEach(id => document.getElementById(id).onchange = () => renderHeat(filtered()));
+document.getElementById('cmpDim').onchange = renderCmp;
+['cmpBy','cmpMode','cmpA','cmpB'].forEach(id => document.getElementById(id).onchange = renderCmp);
+document.getElementById('csv').onclick = exportCsv;
+document.getElementById('theme').onclick = () => {
+  const root = document.documentElement;
+  const isDark = root.dataset.theme ? root.dataset.theme==='dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = isDark ? 'light' : 'dark';
+  try { localStorage.setItem('dash-theme', root.dataset.theme); } catch(e){}
+  if (DATA.length) render();
+};
+try { const t = localStorage.getItem('dash-theme'); if (t) document.documentElement.dataset.theme = t; } catch(e){}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => DATA.length && render());
+const drop = document.getElementById('drop');
+['dragover','dragenter'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+document.addEventListener('dragleave', () => drop.classList.remove('over'));
+document.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); const f = e.dataTransfer.files[0]; if (f) f.arrayBuffer().then(b=>loadBuffer(b, f.name)); });
+loadBase();
+</script>
+</body>
+</html>
