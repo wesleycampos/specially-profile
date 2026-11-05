@@ -35,6 +35,7 @@ Painel de gestão do corpo clínico. Mostra o desempenho dos profissionais, a pe
 | **Cadastro de profissionais** | Formação, registro, admissão, meta, competências, modalidade |
 | **Atendimentos** | Faltas por sessão e por paciente, produtividade, faturamento |
 | **Avaliações** | NPS e satisfação |
+| **Agenda semanal** (uma por unidade) | Aba **Agenda**: quem atende mais/menos, pacientes novos, de saída, sem autorização, ocupação dos horários e vagas em grupo. Vira a carteira ativa (libera retenção e carteira) e aparece na ficha de cada profissional |
 
 Importar uma planilha sem nenhum paciente não apaga nada: o sistema recusa a importação.
 
@@ -53,3 +54,10 @@ Reimportar a planilha mantém as marcações feitas no painel. O filtro **Modali
 ## Ajustes
 - **Categorias de motivo:** `MOTIVOS` em `web/lib/importar.php`. Outra opção é criar uma coluna CATEGORIA na planilha.
 - **Grafias de nomes de profissionais:** `PROF_ALIAS` em `web/lib/importar.php`.
+
+## Agenda semanal das unidades
+- **Formato:** a planilha de agenda como é usada hoje (AGENDA VILA, AGENDA FELICITTÁ). Uma aba por dia e período (`SEGUNDAMANHÃ`, `TERÇA TARDE`, `SÁBADO`…), coluna A com os horários, uma coluna por sala/profissional (`Profissional: Nome` no cabeçalho). Cada célula é um paciente; nas oficinas, linhas numeradas (`1- Fulano`, `2-`).
+- **Marcações lidas nas células:** `PACIENTE DE ENTRADA`/`PCT DE ENTRADA` (novo), `DE SAÍDA`/`VAI SAIR` (saindo), `RETORNO`, `AJUSTE`/`ALTERAÇÃO`/`REMANEJAMENTO`, `SEM AUT`, `CONGELADO`, `FECHADO`/`não tem atendimento` (horário fechado) e datas como `A PARTIR DE 01/11`.
+- **Importar:** aba **Importar** → *Agenda semanal da unidade*. Informe a unidade (ou deixe em branco para usar o nome do arquivo) e a data da agenda. Reimportar com a mesma data substitui; com outra data cria uma nova versão.
+- **Importe toda semana:** o painel compara a agenda atual com a anterior de cada unidade e mostra quem **saiu** e quem **entrou** na agenda de cada profissional. Quem saiu de todas as agendas vira paciente inativo.
+- **Profissionais novos:** quem não existe no cadastro é criado na área deduzida do cabeçalho (a importação avisa quais). Grafias diferentes: `AGENDA_PROF_ALIAS` em `web/lib/agenda.php`. Marcações e áreas: `AGENDA_MARCAS` e `AGENDA_AREAS` no mesmo arquivo.

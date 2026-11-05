@@ -438,6 +438,8 @@ function meta(): array
         'meses' => array_column(rows('SELECT DISTINCT substr(d,1,7) m FROM (SELECT data_saida d FROM saidas UNION SELECT data FROM atendimentos UNION SELECT data FROM avaliacoes) ORDER BY 1'), 'm'),
         'contagens' => $cont,
         'ativos' => (int) one("SELECT COUNT(*) FROM pacientes WHERE status='ativo'"),
+        'agenda' => rows('SELECT v.unidade, v.data_ref, (SELECT COUNT(*) FROM agenda_pacientes ap JOIN agenda_slots s ON s.id=ap.slot_id WHERE s.versao_id=v.id) n
+                          FROM agenda_versoes v WHERE v.data_ref = (SELECT MAX(data_ref) FROM agenda_versoes x WHERE x.unidade=v.unidade) ORDER BY v.unidade'),
     ];
 }
 

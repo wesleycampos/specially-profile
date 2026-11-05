@@ -1,7 +1,7 @@
 /* Painel do Corpo Clínico — front-end (sem build, só Chart.js) */
 const MOT_ORDER = ['Faltas / ausências','Convênio / plano','Decisão da família','Logística / rotina','Mudança de clínica','Insatisfação / adaptação','Não informado','Outros'];
 const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-let META = null, D = null, PROFS_ALL = null, section = 'visao';
+let META = null, D = null, AG = null, PROFS_ALL = null, section = 'visao';
 const charts = {};
 
 /* ---------------- utilitários ---------------- */
@@ -119,7 +119,8 @@ async function loadMeta(){
   $('fDe').value = de; $('fAte').value = ate; $('fEsp').value = esp; $('fConv').value = conv;
 }
 async function refresh(){
-  D = await api('api/dashboard?' + qs());
+  [D, AG] = await Promise.all([api('api/dashboard?' + qs()), api('api/agenda?' + agQs())]);
+  mergeAgenda();
   const c = META.contagens;
   $('sub').textContent = `${c.profissionais} profissionais · ${c.pacientes} pacientes · ${c.saidas} saídas · ${c.atendimentos} atendimentos · ${c.avaliacoes} avaliações`;
   renderSection();
@@ -129,12 +130,12 @@ function go(){
   if (!$('s-' + section)) section = 'visao';
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('on', s.id === 's-' + section));
   document.querySelectorAll('nav.side a[data-s]').forEach(a => a.classList.toggle('on', a.dataset.s === section));
-  const titles = {visao:'Visão geral do corpo clínico', ranking:'Ranking — melhores e piores', individual:'Painel individual', profissionais:'Equipe', areas:'Áreas / especialidades', perdas:'Perda de pacientes', pacientes:'Pacientes', satisfacao:'Satisfação', cadastros:'Cadastros', importar:'Importar dados'};
+  const titles = {visao:'Visão geral do corpo clínico', ranking:'Ranking — melhores e piores', agenda:'Agenda — quem atende mais, novos e saídas', individual:'Painel individual', profissionais:'Equipe', areas:'Áreas / especialidades', perdas:'Perda de pacientes', pacientes:'Pacientes', satisfacao:'Satisfação', cadastros:'Cadastros', importar:'Importar dados'};
   $('title').textContent = titles[section];
   if (D) renderSection();
 }
 function renderSection(){
-  ({visao:rVisao, ranking:rRanking, individual:rIndividual, profissionais:rEquipe, areas:rAreas, perdas:rPerdas, pacientes:rPacientes, satisfacao:rSatisfacao, cadastros:rCadastros, importar:rImportar})[section]();
+  ({visao:rVisao, ranking:rRanking, agenda:rAgenda, individual:rIndividual, profissionais:rEquipe, areas:rAreas, perdas:rPerdas, pacientes:rPacientes, satisfacao:rSatisfacao, cadastros:rCadastros, importar:rImportar})[section]();
 }
 
 /* ---------------- VISÃO GERAL ---------------- */
@@ -210,6 +211,10 @@ function rkDefs(){
       best:'Maior faturamento', worst:'Menor faturamento', hint:'Soma das sessões realizadas no período.'},
     {id:'carteira', k:'carteira', l:'Carteira', high:true, f:v => v + ' pacientes', need:a.ativos, min:p => p.carteira > 0,
       best:'Maiores carteiras', worst:'Menores carteiras', hint:'Pacientes ativos hoje.'},
+    {id:'ag_atend', k:'ag_atend', l:'Atendimentos/semana', high:true, f:v => v + ' atend.', need:!!AG && !AG.vazio, min:p => p.ag_atend != null,
+      best:'Quem mais atende', worst:'Quem menos atende', hint:'Pacientes agendados por semana na agenda das unidades (cada vaga de grupo conta). Veja mais na aba Agenda.'},
+    {id:'ag_novos', k:'ag_novos', l:'Pacientes novos', high:true, f:v => v + ' novos', need:!!AG && !AG.vazio, min:p => p.ag_atend != null,
+      best:'Mais pacientes novos', worst:'Menos pacientes novos', hint:'Pacientes marcados como "paciente de entrada" na agenda atual.'},
   ];
 }
 const modBadge = p => p.modalidade === 'grupo' ? '<span class="modbadge" title="Atende só em grupo">GRUPO</span>' : p.modalidade === 'misto' ? '<span class="modbadge misto" title="Atende individual e em grupo">MISTO</span>' : '';
@@ -256,6 +261,153 @@ function rRanking(){
   $('podWorst').innerHTML = podiumHtml(worst.slice(0,3), d, true);
   $('rkWorst').innerHTML = rkRows(worst.slice(3), d, 4);
   ['podBest','rkBest','podWorst','rkWorst'].forEach(id => bindProfClicks($(id)));
+}
+
+/* ---------------- AGENDA ---------------- */
+const DIAS = ['', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+const PERIODOS = {manha:'Manhã', tarde:'Tarde', noite:'Noite'};
+const agBadge = {novo:['Novo','var(--good)'], retorno:['Retorno','var(--s3)'], saida:['De saída','var(--bad)'], ajuste:['Ajuste','var(--warn)'], sem_aut:['Sem aut.','var(--s6)'], congelado:['Congelado','var(--muted)']};
+const agTag = k => `<span class="agb" style="background:${agBadge[k][1]}">${agBadge[k][0]}</span>`;
+function agQs(){
+  const p = new URLSearchParams();
+  const u = $('agUni')?.value; if (u) p.set('unidade', u);
+  if ($('fEsp').value) p.set('esp', $('fEsp').value);
+  return p.toString();
+}
+function mergeAgenda(){
+  const byId = {}; (AG?.profissionais || []).forEach(x => byId[x.id] = x);
+  D.profissionais.forEach(p => { const x = byId[p.id]; p.ag_atend = x ? x.atendimentos : null; p.ag_novos = x ? x.novos : null; p.ag = x || null; });
+}
+let agMetric = 'atend', agLs = 'novos', agSort = {k:'atendimentos', d:-1};
+function agDefs(){
+  const k = AG.kpis, comp = AG.versoes.some(v => v.anterior);
+  return [
+    {id:'atend', k:'atendimentos', l:'Atendimentos', high:true, f:v => v + ' atend./sem', best:'Quem mais atende', worst:'Quem menos atende',
+      hint:'Pacientes agendados por semana (cada vaga de grupo conta como um atendimento; congelados não contam).'},
+    {id:'pac', k:'pacientes', l:'Pacientes', high:true, f:v => v + ' pacientes', best:'Mais pacientes diferentes', worst:'Menos pacientes', hint:'Pacientes diferentes na agenda da semana.'},
+    {id:'novos', k:'novos', l:'Pacientes novos', high:true, f:v => v + ' novos', best:'Mais pacientes novos', worst:'Menos pacientes novos', min:p => p.atendimentos >= 5,
+      hint:'Pacientes marcados como "PACIENTE DE ENTRADA" / "PCT DE ENTRADA". Mínimo de 5 atendimentos na semana.'},
+    {id:'perdas', k:'perdas', l:'Perdas', high:false, f:v => v + ' saindo', best:'Menos perdas', worst:'Mais perdas', min:p => p.atendimentos >= 5,
+      hint:'Pacientes marcados "DE SAÍDA" / "VAI SAIR"' + (comp ? ' + pacientes que estavam na agenda anterior e não estão mais.' : '. Importe a agenda de novo nas próximas semanas para ver também quem sumiu da agenda.') + ' Para o histórico de saídas, veja a aba Perdas.'},
+    {id:'ocup', k:'ocupacao', l:'Ocupação', high:true, f:pctf, best:'Agenda mais cheia', worst:'Mais horários vagos', min:p => p.horarios + p.vagos >= 5,
+      hint:'Horários com paciente ÷ (horários com paciente + horários vazios). Horários "fechado" não entram.'},
+    {id:'vagos', k:'vagos', l:'Horários vagos', high:false, f:v => v + ' vagos', best:'Menos horários vagos', worst:'Mais horários vagos', min:p => p.horarios + p.vagos >= 5,
+      hint:'Horários sem paciente na grade da semana (não conta os marcados como fechado).'},
+  ];
+}
+function agRows(list, d, start){
+  return `<thead><tr><th class="num">#</th><th>Profissional</th><th class="num">${esc(d.l)}</th><th class="num">Atend.</th><th class="num">Novos</th><th class="num">Perdas</th></tr></thead><tbody>` +
+    list.map((p,i) => `<tr class="click" data-p="${p.id}"><td class="num">${start + i}</td><td>${who(p)}</td><td class="num"><b>${esc(d.f(p[d.k]))}</b></td><td class="num">${p.atendimentos}</td><td class="num">${p.novos || '—'}</td><td class="num">${p.perdas || '—'}</td></tr>`).join('') + '</tbody>';
+}
+function rAgenda(){
+  const sel = $('agUni'), cur = sel.value;
+  sel.innerHTML = '<option value="">Todas</option>' + (AG.unidades || []).map(u => `<option ${u.unidade===cur?'selected':''}>${esc(u.unidade)}</option>`).join('');
+  const parts = ['agKpis','agMetric','agPodBest','agBest','agPodWorst','agWorst','agGrade','agAreas','agLista','agTabela','agLsTabs'];
+  if (AG.vazio){
+    $('agInfo').textContent = 'Nenhuma agenda importada ainda';
+    $('agVazio').innerHTML = `<div class="notice"><span>📅</span><div>Importe a planilha de agenda de cada unidade (uma aba por dia e período, uma coluna por profissional) para ver quem atende mais, quem atende menos, quem tem pacientes novos e quem está perdendo pacientes. <a href="#importar">Ir para Importar →</a></div></div>`;
+    parts.forEach(id => $(id).innerHTML = '');
+    return;
+  }
+  $('agVazio').innerHTML = '';
+  $('agInfo').innerHTML = AG.versoes.map(v => `<b>${esc(v.unidade)}</b>: agenda de ${dataL(v.data_ref)}${v.anterior ? ` (comparada com ${dataL(v.anterior)})` : ''}`).join(' · ') +
+    ($('fEsp').value ? ' · filtrando pela área escolhida no topo' : '');
+  const k = AG.kpis, comp = AG.versoes.some(v => v.anterior);
+  $('agKpis').innerHTML =
+    kpi('cal', 'Atendimentos por semana', fmt(k.atendimentos), `${fmt(k.horarios)} horários ocupados`) +
+    kpi('users', 'Pacientes na agenda', fmt(k.pacientes), `${k.profissionais} profissionais`) +
+    kpi('pct', 'Ocupação dos horários', pctf(k.ocupacao), `${fmt(k.vagos)} horários vagos · ${fmt(k.fechados)} fechados`) +
+    kpi('users', 'Pacientes novos', fmt(k.novos), 'marcados "de entrada"') +
+    kpi('out', 'De saída', fmt(k.saidas), comp ? `+ ${k.saiu_agenda} saíram da agenda desde a anterior` : 'marcados "de saída" / "vai sair"') +
+    kpi('pct', 'Sem autorização', fmt(k.sem_aut), `${k.ajustes} em ajuste · ${k.congelados} congelados`) +
+    kpi('users', 'Vagas livres em grupo', fmt(k.vagas_grupo), 'linhas numeradas vazias nas oficinas');
+
+  // ranking
+  const defs = agDefs();
+  $('agMetric').innerHTML = defs.map(d => `<button data-m="${d.id}" class="${d.id===agMetric?'on':''}">${d.l}</button>`).join('');
+  $('agMetric').querySelectorAll('button').forEach(b => b.onclick = () => { agMetric = b.dataset.m; rAgenda(); });
+  const d = defs.find(x => x.id === agMetric) || defs[0];
+  $('agRkHint').textContent = d.hint;
+  const prof = AG.profissionais.map(p => ({...p, foto_url:p.foto}));
+  const incluiAT = $('agAT').checked;
+  const list = prof.filter(p => p[d.k] != null && (!d.min || d.min(p)) && (incluiAT || !/acompanhamento terap/i.test(p.esp)))
+    .sort((a,b) => (d.high ? b[d.k] - a[d.k] : a[d.k] - b[d.k]) || b.atendimentos - a.atendimentos);
+  const n = Math.min(15, Math.ceil(list.length / 2));
+  const best = list.slice(0, n), worst = [...list].reverse().slice(0, n);
+  $('agBestT').textContent = d.best; $('agWorstT').textContent = d.worst;
+  $('agBestH').textContent = $('agWorstH').textContent = `${list.length} profissionais`;
+  $('agPodBest').innerHTML = podiumHtml(best.slice(0,3), d, false); $('agBest').innerHTML = agRows(best.slice(3), d, 4);
+  $('agPodWorst').innerHTML = podiumHtml(worst.slice(0,3), d, true); $('agWorst').innerHTML = agRows(worst.slice(3), d, 4);
+
+  // grade dia × período
+  const pers = Object.keys(PERIODOS).filter(p => [1,2,3,4,5,6].some(di => AG.grade[di + '|' + p]));
+  const dias = [1,2,3,4,5,6].filter(di => pers.some(p => AG.grade[di + '|' + p]));
+  heat('agGrade', dias, pers, (r,c) => AG.grade[r + '|' + c] || 0, r => DIAS[r], c => PERIODOS[c]);
+
+  // áreas
+  $('agAreas').innerHTML = `<thead><tr><th>Área</th><th class="num">Prof.</th><th class="num">Atend.</th><th class="num">Por prof.</th><th class="num">Ocupação</th><th class="num">Novos</th><th class="num">Perdas</th></tr></thead><tbody>` +
+    AG.areas.map(a => `<tr class="click" data-e="${a.id}"><td><span class="tag"><span class="sw" style="background:${espColor(a.id)}"></span>${esc(a.nome)}</span></td><td class="num">${a.profissionais}</td><td class="num">${a.atendimentos}</td><td class="num">${fmt(a.por_prof)}</td><td class="num">${pctf(a.ocupacao)}</td><td class="num">${a.novos}</td><td class="num">${a.perdas}</td></tr>`).join('') + '</tbody>';
+  $('agAreas').querySelectorAll('tr[data-e]').forEach(tr => tr.onclick = () => { $('fEsp').value = tr.dataset.e; refresh(); });
+
+  rAgLista(); rAgTabela();
+  ['agPodBest','agBest','agPodWorst','agWorst'].forEach(id => bindProfClicks($(id)));
+}
+function rAgLista(){
+  const nome = id => AG.profissionais.find(p => p.id === id)?.nome || '—';
+  const tabs = [['novos','Novos', AG.listas.novos], ['saidas','De saída', AG.listas.saidas], ['saiu','Saíram da agenda', AG.movimento.saiu], ['entrou','Entraram na agenda', AG.movimento.entrou],
+                ['sem_aut','Sem autorização', AG.listas.sem_aut], ['ajustes','Ajuste / alteração', AG.listas.ajustes], ['congelados','Congelados', AG.listas.congelados]];
+  $('agLsTabs').innerHTML = tabs.map(([id,l,xs]) => `<button data-t="${id}" class="${id===agLs?'on':''}">${l} <span style="color:var(--muted)">${xs.length}</span></button>`).join('');
+  $('agLsTabs').querySelectorAll('button').forEach(b => b.onclick = () => { agLs = b.dataset.t; rAgLista(); });
+  const [, , xs] = tabs.find(t => t[0] === agLs);
+  const q = norm($('agLsBusca').value);
+  const rows = xs.filter(x => !q || norm(x.paciente + ' ' + nome(x.prof_id)).includes(q));
+  const mov = agLs === 'saiu' || agLs === 'entrou';
+  $('agLsHint').textContent = mov ? 'Comparação entre a agenda atual e a importada antes dela, por profissional' : 'Marcações feitas na própria agenda';
+  $('agLista').innerHTML = rows.length ? `<thead><tr><th>Paciente</th><th>Profissional</th><th>Unidade</th><th>${mov ? 'Entre as agendas de' : 'Horário'}</th><th>${mov ? '' : 'Como está na agenda'}</th></tr></thead><tbody>` +
+    rows.map(x => `<tr class="click" data-p="${x.prof_id}"><td><b>${esc(x.paciente)}</b></td><td>${esc(nome(x.prof_id))}</td><td>${esc(x.unidade)}</td>
+      <td>${mov ? `${dataL(x.de)} → ${dataL(x.ate)}` : `${DIAS[x.dia]} ${esc(x.hora)}`}</td><td style="color:var(--text-2)">${mov ? '' : esc(x.texto)}${x.data ? ` <span class="tag">${dataL(x.data)}</span>` : ''}</td></tr>`).join('') + '</tbody>'
+    : `<tr><td class="empty">${mov && !AG.versoes.some(v => v.anterior) ? 'Só existe uma agenda importada por unidade. Importe a agenda de novo nas próximas semanas para ver quem saiu e quem entrou.' : 'Nenhum paciente nesta lista'}</td></tr>`;
+  bindProfClicks($('agLista'));
+}
+const AG_COLS = [['nome','Profissional'], ['unidades','Unidade'], ['atendimentos','Atend./sem'], ['atend_grupo','Em grupo'], ['pacientes','Pacientes'], ['novos','Novos'],
+                 ['saidas','De saída'], ['saiu_agenda','Saíram'], ['entrou_agenda','Entraram'], ['ocupacao','Ocupação'], ['vagos','Vagos'], ['fechados','Fechados'],
+                 ['sem_aut','Sem aut.'], ['dias','Dias'], ['saidas_12m','Saídas 12m']];
+function agFiltrados(){
+  const q = norm($('agBusca').value);
+  return AG.profissionais.filter(p => !q || norm(p.nome + ' ' + p.esp).includes(q))
+    .sort((a,b) => { const u = a[agSort.k], v = b[agSort.k]; return (typeof u === 'string' || Array.isArray(u) ? String(u).localeCompare(String(v)) : (u ?? -1) - (v ?? -1)) * agSort.d; });
+}
+function rAgTabela(){
+  const rows = agFiltrados();
+  $('agTabela').innerHTML = `<thead><tr>${AG_COLS.map(([k,l]) => `<th data-k="${k}" class="${k==='nome'||k==='unidades'?'':'num'}" title="${k==='saidas_12m'?'Saídas registradas na planilha de saídas nos últimos 12 meses':''}">${l}${agSort.k===k?(agSort.d>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>` +
+    rows.map(p => `<tr class="click" data-p="${p.id}">${AG_COLS.map(([k]) => k === 'nome' ? `<td>${who({...p, foto_url:p.foto})}</td>` : k === 'unidades' ? `<td>${p.unidades.map(esc).join(', ')}</td>`
+      : `<td class="num">${k === 'ocupacao' ? pctf(p[k]) : (p[k] || (k === 'atendimentos' ? 0 : '—'))}</td>`).join('')}</tr>`).join('') + '</tbody>';
+  $('agTabela').querySelectorAll('th').forEach(th => th.onclick = () => { agSort = {k:th.dataset.k, d: agSort.k === th.dataset.k ? -agSort.d : (th.dataset.k === 'nome' ? 1 : -1)}; rAgTabela(); });
+  bindProfClicks($('agTabela'));
+}
+function csvAgenda(){
+  const head = ['Profissional','Área', ...AG_COLS.slice(1).map(c => c[1])];
+  const lines = [head, ...agFiltrados().map(p => [p.nome, p.esp, ...AG_COLS.slice(1).map(([k]) => Array.isArray(p[k]) ? p[k].join(' / ') : (p[k] ?? ''))])];
+  const blob = new Blob(['﻿' + lines.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(';')).join('\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'agenda_profissionais.csv'; a.click();
+}
+/** Grade semanal do profissional, para a ficha. */
+function agendaGrid(slots){
+  if (!slots.length) return '<div class="empty">Este profissional não aparece nas agendas importadas</div>';
+  const unis = [...new Set(slots.map(s => s.unidade))];
+  return unis.map(u => {
+    const ss = slots.filter(s => s.unidade === u);
+    const dias = [1,2,3,4,5,6].filter(d => ss.some(s => s.dia === d));
+    const horas = [...new Set(ss.map(s => s.hora))].sort();
+    const cell = (d, h) => ss.filter(s => s.dia === d && s.hora === h).map(s => {
+      if (s.situacao === 'fechado') return `<div class="agc fech" title="${esc(s.obs)}">fechado</div>`;
+      if (!s.pacientes.length) return `<div class="agc vago">vago</div>`;
+      return `<div class="agc ${s.modalidade === 'grupo' ? 'grp' : ''}" title="${esc(s.sala || '')}${s.aplicadores ? ' · ' + esc(s.aplicadores) : ''}">${s.modalidade === 'grupo' ? `<div class="agg">grupo${s.vagas_grupo ? ` · ${s.vagas_grupo} vaga(s)` : ''}</div>` : ''}` +
+        s.pacientes.map(p => `<div>${esc(p.nome)} ${Object.keys(agBadge).filter(k => +p[k]).map(agTag).join(' ')}</div>`).join('') + '</div>';
+    }).join('');
+    return `${unis.length > 1 ? `<h3 style="margin:10px 0 6px;font-size:13px">${esc(u)}</h3>` : ''}<div class="tablewrap" style="max-height:460px"><table class="aggrid"><thead><tr><th>Hora</th>${dias.map(d => `<th>${DIAS[d]}</th>`).join('')}</tr></thead><tbody>` +
+      horas.map(h => `<tr><td class="num"><b>${h}</b></td>${dias.map(d => `<td>${cell(d, h)}</td>`).join('')}</tr>`).join('') + '</tbody></table></div>';
+  }).join('');
 }
 
 /* ---------------- PAINEL INDIVIDUAL ---------------- */
@@ -527,7 +679,8 @@ function rSatisfacao(){
 
 /* ---------------- FICHA DO PROFISSIONAL ---------------- */
 async function openProf(id){
-  const f = await api('api/profissional/' + id);
+  const [f, agSlots] = await Promise.all([api('api/profissional/' + id), api('api/agenda/prof/' + id)]);
+  const ag = AG?.profissionais?.find(x => x.id === id);
   const p = D.profissionais.find(x => x.id === id) || {...f, esp_id:f.especialidade_id, saidas:0, motivos:{}, competencias:[]};
   const dlg = $('dlg');
   const stars = n => n ? `<span class="stars">${'★'.repeat(n)}<span class="off">${'★'.repeat(5-n)}</span></span>` : '';
@@ -561,6 +714,7 @@ async function openProf(id){
         <div class="card"><h2>Carteira ativa (${f.carteira.length})</h2>${f.carteira.length ? `<div class="tablewrap" style="max-height:280px"><table><tbody>${f.carteira.map(c => `<tr><td>${esc(c.paciente)}</td><td>${esc(c.convenio)}</td><td>${dataL(c.inicio)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Sem carteira importada</div>'}</div>
         <div class="card"><h2>Avaliações (${f.avaliacoes.length})</h2>${f.avaliacoes.length ? f.avaliacoes.slice(0,15).map(a => `<div style="padding:6px 0;border-bottom:1px solid var(--grid)"><b>${a.nota}</b>/10 <span style="color:var(--muted)">${dataL(a.data)} · ${esc(a.paciente||'')}</span><div>${esc(a.comentario||'')}</div></div>`).join('') : '<div class="empty">Sem avaliações</div>'}</div>
       </div>
+      ${agSlots.length ? `<div class="card"><h2>Agenda semanal</h2><div class="hint">${ag ? `${ag.atendimentos} atendimentos/semana · ${ag.pacientes} pacientes · ${ag.novos} novos · ${ag.perdas} de saída · ocupação ${pctf(ag.ocupacao)}` : 'Agenda mais recente de cada unidade'}</div>${agendaGrid(agSlots)}</div>` : ''}
       ${f.atend_mes.length ? `<div class="card"><h2>Sessões e faltas por mês</h2><div class="chartbox" style="height:220px"><canvas id="cProfAt"></canvas></div></div>` : ''}
     </div>`;
   dlg.showModal();
@@ -663,7 +817,29 @@ function rImportar(){
     <div class="count">${fmt(cnt[x.c])} <span style="font-size:13px;font-weight:400;color:var(--muted)">registros no banco</span></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="api/modelo?tipo=${x.t}">⬇ Baixar modelo</a>
     <label class="btn primary">⬆ Importar planilha<input type="file" accept=".xlsx" data-t="${x.t}" hidden></label></div></div>`).join('');
-  $('impCards').querySelectorAll('input[type=file]').forEach(inp => inp.onchange = async () => {
+  const unis = [...new Set([...(META.agenda || []).map(a => a.unidade), 'VILA', 'FELICITTÁ'])];
+  const hoje = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  $('impCards').insertAdjacentHTML('afterbegin', `<div class="card imp"><h2>Agenda semanal da unidade</h2>
+    <div class="hint" style="margin:0">A planilha de agenda como ela é usada hoje: uma aba por dia e período (SEGUNDAMANHÃ…), coluna A com os horários e uma coluna por sala/profissional. Libera rankings de atendimento, pacientes novos, saídas e ocupação, e passa a ser a <b>carteira ativa</b>. Importe de novo toda semana: o painel compara com a agenda anterior e mostra quem saiu.</div>
+    <div class="count">${fmt((META.agenda || []).reduce((s, a) => s + a.n, 0))} <span style="font-size:13px;font-weight:400;color:var(--muted)">${(META.agenda || []).length ? (META.agenda || []).map(a => `${esc(a.unidade)} ${dataL(a.data_ref)}`).join(' · ') : 'atendimentos na agenda'}</span></div>
+    <div class="filters"><label>Unidade</label><input id="impAgUni" list="impAgUnis" placeholder="ex.: VILA" style="width:130px"><datalist id="impAgUnis">${unis.map(u => `<option value="${esc(u)}">`).join('')}</datalist>
+      <label>Agenda de</label><input type="date" id="impAgData" value="${hoje}"></div>
+    <div><label class="btn primary">⬆ Importar agenda<input type="file" accept=".xlsx" id="impAgFile" hidden></label></div></div>`);
+  $('impAgFile').onchange = async () => {
+    const inp = $('impAgFile'), f = inp.files[0]; if (!f) return;
+    let uni = $('impAgUni').value.trim();
+    if (!uni) { const m = f.name.replace(/\.xlsx$/i, '').replace(/^agenda\s*/i, '').trim(); uni = m.toUpperCase(); }
+    if (!uni) { toast('Informe a unidade antes de importar.'); inp.value = ''; return; }
+    toast(`Importando a agenda de ${uni}…`, 2500);
+    try {
+      const p = new URLSearchParams({tipo:'agenda', unidade:uni, data:$('impAgData').value, arquivo:f.name});
+      const r = await api('api/importar?' + p, {method:'POST', body: await f.arrayBuffer()});
+      toast(`Agenda ${r.unidade} (${dataL(r.data_ref)}): ${r.importados} atendimentos de ${r.pacientes} pacientes.` + (r.avisos?.length ? '\n' + r.avisos.join('\n') : ''), r.avisos?.length ? 15000 : 4000);
+      PROFS_ALL = null; await loadMeta(); await refresh();
+    } catch (e) { toast('Erro: ' + e.message, 9000); }
+    inp.value = '';
+  };
+  $('impCards').querySelectorAll('input[type=file][data-t]').forEach(inp => inp.onchange = async () => {
     const f = inp.files[0]; if (!f) return;
     try {
       const r = await api('api/importar?tipo=' + inp.dataset.t, {method:'POST', body: await f.arrayBuffer()});
@@ -680,6 +856,8 @@ let tmr; const deb = fn => () => { clearTimeout(tmr); tmr = setTimeout(fn, 180);
 $('fClear').onclick = () => { let tmr; const deb = fn => () => { clearTimeout(tmr); tmr = setTimeout(fn, 180); };
 ['fDe','fAte','fEsp','fConv','fMod'].forEach(id => $(id).value = ''); refresh(); };
 $('rkEsp').onchange = rRanking;
+$('agUni').onchange = async () => { AG = await api('api/agenda?' + agQs()); mergeAgenda(); renderSection(); };
+$('agAT').onchange = rAgenda; $('agBusca').oninput = deb(rAgTabela); $('agLsBusca').oninput = deb(rAgLista); $('agCsv').onclick = csvAgenda;
 $('indBusca').oninput = deb(rIndividual);
 $('pcBusca').oninput = deb(rEquipe); $('pcSort').onchange = rEquipe; $('pcMov').onchange = rEquipe;
 $('plBusca').oninput = deb(rPerdas);

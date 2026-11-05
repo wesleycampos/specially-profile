@@ -111,6 +111,50 @@ CREATE TABLE IF NOT EXISTS avaliacoes (
   comentario       TEXT
 );
 
+-- Agenda semanal das unidades: cada importação da planilha de agenda gera uma versão
+CREATE TABLE IF NOT EXISTS agenda_versoes (
+  id            INTEGER PRIMARY KEY,
+  unidade       TEXT NOT NULL,          -- VILA, FELICITTÁ...
+  data_ref      TEXT NOT NULL,          -- data a que a agenda se refere (AAAA-MM-DD)
+  importado_em  TEXT NOT NULL DEFAULT (datetime('now')),
+  arquivo       TEXT,
+  UNIQUE (unidade, data_ref)
+);
+
+-- Um horário (dia × período × hora) de uma coluna (sala/profissional) da agenda
+CREATE TABLE IF NOT EXISTS agenda_slots (
+  id               INTEGER PRIMARY KEY,
+  versao_id        INTEGER NOT NULL REFERENCES agenda_versoes(id) ON DELETE CASCADE,
+  dia              INTEGER NOT NULL,     -- 1 = segunda ... 6 = sábado
+  periodo          TEXT NOT NULL,        -- manha | tarde | noite
+  hora             TEXT NOT NULL,        -- HH:MM
+  profissional_id  INTEGER NOT NULL REFERENCES profissionais(id) ON DELETE CASCADE,
+  sala             TEXT,
+  aplicadores      TEXT,
+  situacao         TEXT NOT NULL,        -- ocupado | vago | fechado
+  modalidade       TEXT NOT NULL,        -- individual | grupo
+  vagas_grupo      INTEGER NOT NULL DEFAULT 0,
+  obs              TEXT
+);
+
+-- Paciente em um horário da agenda, com as marcações da célula
+CREATE TABLE IF NOT EXISTS agenda_pacientes (
+  id           INTEGER PRIMARY KEY,
+  slot_id      INTEGER NOT NULL REFERENCES agenda_slots(id) ON DELETE CASCADE,
+  paciente_id  INTEGER NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+  texto        TEXT,                    -- como estava escrito na planilha
+  novo         INTEGER NOT NULL DEFAULT 0,   -- PACIENTE DE ENTRADA
+  retorno      INTEGER NOT NULL DEFAULT 0,
+  saida        INTEGER NOT NULL DEFAULT 0,   -- DE SAÍDA / VAI SAIR
+  ajuste       INTEGER NOT NULL DEFAULT 0,   -- AJUSTE / ALTERAÇÃO / REMANEJAMENTO
+  sem_aut      INTEGER NOT NULL DEFAULT 0,   -- sem autorização do convênio
+  congelado    INTEGER NOT NULL DEFAULT 0,
+  data_marca   TEXT,                    -- data citada na marcação ("A PARTIR DE 01/11", "DE SAÍDA 01/12")
+  obs          TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_agslot_versao ON agenda_slots(versao_id, profissional_id);
+CREATE INDEX IF NOT EXISTS ix_agpac_slot ON agenda_pacientes(slot_id);
+
 CREATE INDEX IF NOT EXISTS ix_saidas_data ON saidas(data_saida);
 CREATE INDEX IF NOT EXISTS ix_atend_prof ON atendimentos(profissional_id, data);
 CREATE INDEX IF NOT EXISTS ix_aval_prof ON avaliacoes(profissional_id, data);

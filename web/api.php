@@ -6,6 +6,7 @@ declare(strict_types=1);
 require __DIR__ . '/lib/core.php';
 require __DIR__ . '/lib/importar.php';
 require __DIR__ . '/lib/painel.php';
+require __DIR__ . '/lib/agenda.php';
 
 security_headers();
 set_time_limit(120);
@@ -49,6 +50,12 @@ try {
         if ($r === 'dashboard') {
             send(200, dashboard($_GET));
         }
+        if ($r === 'agenda') {
+            send(200, agenda_painel($_GET));
+        }
+        if (preg_match('#^agenda/prof/(\d+)$#', $r, $m)) {
+            send(200, agenda_profissional((int) $m[1]));
+        }
         if ($r === 'profissionais') {
             send(200, rows('SELECT p.*, e.nome esp, (SELECT COUNT(*) FROM competencias c WHERE c.profissional_id=p.id) n_comp,
                                    (SELECT COUNT(*) FROM saida_profissionais sp WHERE sp.profissional_id=p.id) n_saidas
@@ -73,6 +80,13 @@ try {
         }
     }
     if ($method === 'POST') {
+        if ($r === 'importar' && ($_GET['tipo'] ?? '') === 'agenda') {
+            $bytes = (string) file_get_contents('php://input');
+            if (strlen($bytes) > 15 * 1024 * 1024) {
+                send(413, ['erro' => 'Planilha maior que 15 MB.']);
+            }
+            send(200, importar_agenda($bytes, (string) ($_GET['unidade'] ?? ''), $_GET['data'] ?? null, isset($_GET['arquivo']) ? mb_substr((string) $_GET['arquivo'], 0, 120) : null));
+        }
         if ($r === 'importar') {
             $fn = IMPORTADORES[$_GET['tipo'] ?? ''] ?? null;
             if (!$fn) {

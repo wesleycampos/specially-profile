@@ -230,3 +230,13 @@ details.ploss .inner{padding:4px 8px 12px 52px}
 .mbody>*{min-width:0}
 @media (max-width:700px){.form-grid{grid-template-columns:minmax(0,1fr)}}
 .form-grid input[type=file]{font-size:12px}
+/* agenda */
+.agb{display:inline-block;font-size:10px;font-weight:700;color:#fff;border-radius:999px;padding:1px 6px;margin-left:2px;vertical-align:1px;white-space:nowrap}
+.aggrid th,.aggrid td{vertical-align:top}
+.aggrid td{min-width:150px;font-size:12px}
+.agc{border-radius:8px;padding:5px 7px;background:var(--surface-2);line-height:1.45}
+.agc+.agc{margin-top:4px}
+.agc.grp{border-left:3px solid var(--brand)}
+.agc.vago{color:var(--muted);background:transparent;border:1px dashed var(--border);text-align:center}
+.agc.fech{color:var(--muted);background:transparent;text-align:center;font-style:italic}
+.agg{font-size:10.5px;color:var(--text-2);text-transform:uppercase;letter-spacing:.04em;font-weight:600}

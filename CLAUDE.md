@@ -17,6 +17,7 @@ Se o banco não existir localmente, `web/lib/schema.sql` descreve a estrutura.
 - Categorias de motivo de saída: `MOTIVOS` em `web/lib/importar.php`.
 - Grafias de nomes de profissionais: `PROF_ALIAS` em `web/lib/importar.php`.
 - Perdas evitáveis: `EVITAVEIS` em `web/lib/core.php`.
+- Agenda semanal (planilhas AGENDA VILA / FELICITTÁ): leitura, importação e painel em `web/lib/agenda.php` (`AGENDA_MARCAS`, `AGENDA_AREAS`, `AGENDA_PROF_ALIAS`). Cada importação é uma versão por unidade (`agenda_versoes`); a mais recente vira a carteira ativa (vínculos com origem `agenda:<UNIDADE>`).
 - Conector somente leitura para o Specially Central: `web/integracao.php` (token Bearer).
 
 ## Trabalho em dois PCs

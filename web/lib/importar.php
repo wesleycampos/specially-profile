@@ -88,6 +88,13 @@ function parse_date($v): ?string
 // ------------------------------------------------------------------ leitura de xlsx (sem bibliotecas)
 function xlsx_rows(string $bytes): array
 {
+    $abas = xlsx_sheets($bytes, true);
+    return reset($abas) ?: [];
+}
+
+/** Abas da planilha na ordem do workbook: [nome da aba => linhas]. $soPrimeira lê só a primeira. */
+function xlsx_sheets(string $bytes, bool $soPrimeira = false): array
+{
     $tmp = tempnam(sys_get_temp_dir(), 'xlsx');
     file_put_contents($tmp, $bytes);
     $zip = new ZipArchive();
@@ -110,31 +117,46 @@ function xlsx_rows(string $bytes): array
             }
         }
     }
-    // primeira aba do workbook
-    $path = 'xl/worksheets/sheet1.xml';
+    // abas na ordem do workbook
+    $paths = [];
     $wb = $zip->getFromName('xl/workbook.xml');
     $rels = $zip->getFromName('xl/_rels/workbook.xml.rels');
     if ($wb !== false && $rels !== false) {
+        $alvo = [];
+        foreach (simplexml_load_string($rels)->Relationship as $rel) {
+            $tgt = ltrim((string) $rel['Target'], '/');
+            $alvo[(string) $rel['Id']] = str_starts_with($tgt, 'xl/') ? $tgt : 'xl/' . $tgt;
+        }
         $w = simplexml_load_string($wb);
         $w->registerXPathNamespace('m', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
-        $first = $w->xpath('//m:sheets/m:sheet')[0] ?? null;
-        if ($first) {
-            $rid = (string) $first->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships')['id'];
-            foreach (simplexml_load_string($rels)->Relationship as $rel) {
-                if ((string) $rel['Id'] === $rid) {
-                    $tgt = ltrim((string) $rel['Target'], '/');
-                    $path = str_starts_with($tgt, 'xl/') ? $tgt : 'xl/' . $tgt;
-                }
+        foreach ($w->xpath('//m:sheets/m:sheet') as $sh) {
+            $rid = (string) $sh->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships')['id'];
+            if (isset($alvo[$rid])) {
+                $paths[(string) $sh['name']] = $alvo[$rid];
             }
         }
     }
-    $xml = $zip->getFromName($path);
+    $paths = $paths ?: ['Planilha1' => 'xl/worksheets/sheet1.xml'];
+    if ($soPrimeira) {
+        $paths = array_slice($paths, 0, 1, true);
+    }
+    $abas = [];
+    foreach ($paths as $nome => $path) {
+        $xml = $zip->getFromName($path);
+        if ($xml !== false) {
+            $abas[$nome] = xlsx_sheet_rows(simplexml_load_string($xml), $shared);
+        }
+    }
     $zip->close();
     @unlink($tmp);
-    if ($xml === false) {
+    if (!$abas) {
         throw new RuntimeException('Não encontrei a primeira aba da planilha.');
     }
-    $sheet = simplexml_load_string($xml);
+    return $abas;
+}
+
+function xlsx_sheet_rows(SimpleXMLElement $sheet, array $shared): array
+{
     $out = [];
     foreach ($sheet->sheetData->row as $row) {
         $r = [];
