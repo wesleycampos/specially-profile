@@ -305,11 +305,17 @@ function rAgenda(){
   const parts = ['agKpis','agMetric','agPodBest','agBest','agPodWorst','agWorst','agGrade','agAreas','agLista','agTabela','agLsTabs'];
   if (AG.vazio){
     $('agInfo').textContent = 'Nenhuma agenda importada ainda';
-    $('agVazio').innerHTML = `<div class="notice"><span>📅</span><div>Importe a planilha de agenda de cada unidade (uma aba por dia e período, uma coluna por profissional) para ver quem atende mais, quem atende menos, quem tem pacientes novos e quem está perdendo pacientes. <a href="#importar">Ir para Importar →</a></div></div>`;
+    $('agVazio').innerHTML = `<div class="card"><div class="empty" style="padding:40px 20px">
+      <div style="font-size:40px">📅</div>
+      <h2 style="margin:8px 0 6px;color:var(--text)">Nenhuma agenda importada ainda</h2>
+      <div style="max-width:560px;margin:0 auto 16px">Importe a planilha de agenda de cada unidade (AGENDA VILA, AGENDA FELICITTÁ) para ver quem atende mais, quem atende menos, quem tem pacientes novos e quem está perdendo pacientes. Importe de novo toda semana para acompanhar quem saiu da agenda.</div>
+      <a class="btn primary" href="#importar">⬆ Importar agenda</a></div></div>`;
     parts.forEach(id => $(id).innerHTML = '');
+    $('agConteudo').style.display = 'none';
     return;
   }
   $('agVazio').innerHTML = '';
+  $('agConteudo').style.display = 'grid';
   $('agInfo').innerHTML = AG.versoes.map(v => `<b>${esc(v.unidade)}</b>: agenda de ${dataL(v.data_ref)}${v.anterior ? ` (comparada com ${dataL(v.anterior)})` : ''}`).join(' · ') +
     ($('fEsp').value ? ' · filtrando pela área escolhida no topo' : '');
   const k = AG.kpis, comp = AG.versoes.some(v => v.anterior);
