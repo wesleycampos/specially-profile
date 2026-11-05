@@ -384,15 +384,19 @@ function unidade_norm(string $u): string
 
 // ------------------------------------------------------------------ importação
 /**
- * Importa a planilha de agenda de uma unidade. Cria (ou substitui, se for a mesma data) uma versão da agenda
- * e atualiza a carteira ativa (vínculos de origem "agenda:<UNIDADE>") a partir da versão mais recente.
+ * Importa a planilha de agenda de uma unidade e atualiza a carteira ativa (vínculos de origem "agenda:<UNIDADE>")
+ * a partir da versão mais recente.
+ *  $modo = 'atualizar'    : cria uma versão nova (agenda da semana); a anterior fica guardada para comparar
+ *                           quem saiu e quem entrou. Se já houver versão com a mesma data, ela é substituída.
+ *  $modo = 'sobrescrever' : substitui a agenda mais recente da unidade (correção da mesma semana), sem criar histórico.
  */
-function importar_agenda(string $bytes, string $unidade, ?string $dataRef = null, ?string $arquivo = null): array
+function importar_agenda(string $bytes, string $unidade, ?string $dataRef = null, ?string $arquivo = null, string $modo = 'atualizar'): array
 {
     $unidade = unidade_norm($unidade);
     if ($unidade === '') {
         throw new InvalidArgumentException('Informe a unidade da agenda (ex.: VILA, FELICITTÁ).');
     }
+    $modo = $modo === 'sobrescrever' ? 'sobrescrever' : 'atualizar';
     $dataRef = $dataRef && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dataRef) ? $dataRef : date('Y-m-d');
     $lido = agenda_ler($bytes);
     $avisos = $lido['avisos'];
@@ -417,6 +421,14 @@ function importar_agenda(string $bytes, string $unidade, ?string $dataRef = null
     $pdo = db();
     $pdo->beginTransaction();
     try {
+        $ultima = q('SELECT id, data_ref FROM agenda_versoes WHERE unidade=? ORDER BY data_ref DESC LIMIT 1', [$unidade])->fetch();
+        if ($modo === 'sobrescrever' && $ultima) {
+            q('DELETE FROM agenda_versoes WHERE id=?', [$ultima['id']]);   // apaga os horários junto (cascade)
+            $avisos[] = 'A agenda anterior de ' . $unidade . ' (' . date('d/m/Y', strtotime($ultima['data_ref'])) . ') foi substituída por esta.';
+        } elseif ($ultima && $dataRef < $ultima['data_ref']) {
+            $avisos[] = 'Atenção: a data informada é anterior à agenda mais recente de ' . $unidade . ' (' . date('d/m/Y', strtotime($ultima['data_ref']))
+                . '). Ela foi guardada como histórico e não substitui a atual.';
+        }
         $vid = one('SELECT id FROM agenda_versoes WHERE unidade=? AND data_ref=?', [$unidade, $dataRef]);
         if ($vid) {
             q('DELETE FROM agenda_slots WHERE versao_id=?', [$vid]);

@@ -58,6 +58,8 @@ Reimportar a planilha mantém as marcações feitas no painel. O filtro **Modali
 ## Agenda semanal das unidades
 - **Formato:** a planilha de agenda como é usada hoje (AGENDA VILA, AGENDA FELICITTÁ). Uma aba por dia e período (`SEGUNDAMANHÃ`, `TERÇA TARDE`, `SÁBADO`…), coluna A com os horários, uma coluna por sala/profissional (`Profissional: Nome` no cabeçalho). Cada célula é um paciente; nas oficinas, linhas numeradas (`1- Fulano`, `2-`).
 - **Marcações lidas nas células:** `PACIENTE DE ENTRADA`/`PCT DE ENTRADA` (novo), `DE SAÍDA`/`VAI SAIR` (saindo), `RETORNO`, `AJUSTE`/`ALTERAÇÃO`/`REMANEJAMENTO`, `SEM AUT`, `CONGELADO`, `FECHADO`/`não tem atendimento` (horário fechado) e datas como `A PARTIR DE 01/11`.
-- **Importar:** aba **Importar** → *Agenda semanal da unidade*. Informe a unidade (ou deixe em branco para usar o nome do arquivo) e a data da agenda. Reimportar com a mesma data substitui; com outra data cria uma nova versão.
+- **Importar:** aba **Importar** → *Agenda semanal da unidade*. Informe a unidade (ou deixe em branco para usar o nome do arquivo) e a data da agenda. Escolha o modo:
+  - **Atualizar** (padrão): agenda de uma nova semana. A atual fica guardada como histórico, para comparar quem saiu e quem entrou. Se já existir agenda com a mesma data, ela é substituída.
+  - **Sobrescrever**: corrige a agenda atual da unidade (mesma semana). A versão mais recente é apagada e trocada pela nova, sem histórico. O painel pede confirmação.
 - **Importe toda semana:** o painel compara a agenda atual com a anterior de cada unidade e mostra quem **saiu** e quem **entrou** na agenda de cada profissional. Quem saiu de todas as agendas vira paciente inativo.
 - **Profissionais novos:** quem não existe no cadastro é criado na área deduzida do cabeçalho (a importação avisa quais). Grafias diferentes: `AGENDA_PROF_ALIAS` em `web/lib/agenda.php`. Marcações e áreas: `AGENDA_MARCAS` e `AGENDA_AREAS` no mesmo arquivo.

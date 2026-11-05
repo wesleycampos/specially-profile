@@ -85,7 +85,7 @@ try {
             if (strlen($bytes) > 15 * 1024 * 1024) {
                 send(413, ['erro' => 'Planilha maior que 15 MB.']);
             }
-            send(200, importar_agenda($bytes, (string) ($_GET['unidade'] ?? ''), $_GET['data'] ?? null, isset($_GET['arquivo']) ? mb_substr((string) $_GET['arquivo'], 0, 120) : null));
+            send(200, importar_agenda($bytes, (string) ($_GET['unidade'] ?? ''), $_GET['data'] ?? null, isset($_GET['arquivo']) ? mb_substr((string) $_GET['arquivo'], 0, 120) : null, (string) ($_GET['modo'] ?? 'atualizar')));
         }
         if ($r === 'importar') {
             $fn = IMPORTADORES[$_GET['tipo'] ?? ''] ?? null;

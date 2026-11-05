@@ -830,6 +830,9 @@ function rImportar(){
     <div class="count">${fmt((META.agenda || []).reduce((s, a) => s + a.n, 0))} <span style="font-size:13px;font-weight:400;color:var(--muted)">${(META.agenda || []).length ? (META.agenda || []).map(a => `${esc(a.unidade)} ${dataL(a.data_ref)}`).join(' · ') : 'atendimentos na agenda'}</span></div>
     <div class="filters"><label>Unidade</label><input id="impAgUni" list="impAgUnis" placeholder="ex.: VILA" style="width:130px"><datalist id="impAgUnis">${unis.map(u => `<option value="${esc(u)}">`).join('')}</datalist>
       <label>Agenda de</label><input type="date" id="impAgData" value="${hoje}"></div>
+    <div style="display:grid;gap:4px;font-size:12.5px">
+      <label><input type="radio" name="impAgModo" value="atualizar" checked> <b>Atualizar</b> — agenda de uma nova semana. A atual fica guardada e o painel mostra quem saiu e quem entrou.</label>
+      <label><input type="radio" name="impAgModo" value="sobrescrever"> <b>Sobrescrever</b> — corrige a agenda atual da unidade (mesma semana), sem guardar a anterior.</label></div>
     <div><label class="btn primary">⬆ Importar agenda<input type="file" accept=".xlsx" id="impAgFile" hidden></label></div></div>`);
   $('impAgFile').onchange = async () => {
     const inp = $('impAgFile'), f = inp.files[0]; if (!f) return;
@@ -838,7 +841,9 @@ function rImportar(){
     if (!uni) { toast('Informe a unidade antes de importar.'); inp.value = ''; return; }
     toast(`Importando a agenda de ${uni}…`, 2500);
     try {
-      const p = new URLSearchParams({tipo:'agenda', unidade:uni, data:$('impAgData').value, arquivo:f.name});
+      const modo = document.querySelector('input[name=impAgModo]:checked')?.value || 'atualizar';
+      if (modo === 'sobrescrever' && !confirm(`Substituir a agenda atual de ${uni} por esta planilha? A versão anterior será apagada.`)) { inp.value = ''; return; }
+      const p = new URLSearchParams({tipo:'agenda', unidade:uni, data:$('impAgData').value, arquivo:f.name, modo});
       const r = await api('api/importar?' + p, {method:'POST', body: await f.arrayBuffer()});
       toast(`Agenda ${r.unidade} (${dataL(r.data_ref)}): ${r.importados} atendimentos de ${r.pacientes} pacientes.` + (r.avisos?.length ? '\n' + r.avisos.join('\n') : ''), r.avisos?.length ? 15000 : 4000);
       PROFS_ALL = null; await loadMeta(); await refresh();
