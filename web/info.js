@@ -100,6 +100,21 @@ const INFO = {
   'pacientes em movimento': 'Listas de pacientes novos, de saída, que saíram ou entraram na agenda, sem autorização, em ajuste e congelados.',
   'todos os profissionais na agenda': 'Indicadores da agenda de cada profissional. Clique no cabeçalho para ordenar.',
   'agenda semanal': 'Grade da semana do profissional na agenda mais recente de cada unidade.',
+
+  /* ---------- lotação (grade da semana do Hipo) ---------- */
+  'terapeutas ativos': 'Profissionais marcados como ativos no cadastro (vindos do Hipo ou conciliados). Aplicadores ABA sem agenda própria entram como apoio: atendem na agenda de outro terapeuta e não somam horários.',
+  'capacidade semanal': 'Soma dos horários de atendimento por semana de todos os terapeutas ativos. Para cada um vale, nesta ordem: a capacidade informada à mão; a carga horária × 1,3 sessão por hora (grade do Hipo: 14 sessões de 45 min em 10h45); ou o turno que ele já faz na agenda, do primeiro ao último horário de cada dia.',
+  'capacidade': 'Horários de atendimento por semana. Informada à mão, calculada pela carga horária ou estimada pelo turno na agenda (veja a coluna Origem). Nunca fica menor do que o que já está agendado.',
+  'horarios ocupados': 'Horários da semana com paciente agendado, mais os bloqueados pelo profissional (folga, fechamento de turno). Vários pacientes no mesmo horário (grupo) contam um horário só.',
+  'ocupados': 'Horários da semana com paciente agendado mais os bloqueados. Um horário com grupo conta uma vez.',
+  'livres': 'Capacidade menos os horários ocupados e bloqueados: onde ainda cabe paciente.',
+  'ocupacao da capacidade': 'Horários ocupados e bloqueados ÷ capacidade semanal. Acima de 90% (vermelho) a área está praticamente lotada; entre 75% e 90% (laranja), perto do limite.',
+  'uso da capacidade': 'Horários ocupados e bloqueados ÷ capacidade. Vermelho a partir de 90%, laranja a partir de 75%.',
+  'pacientes na semana': 'Pacientes diferentes com pelo menos uma sessão na grade da semana do Hipo.',
+  'horarios por paciente': 'Quantos horários por semana cada paciente usa, em média, na área (ocupados ÷ pacientes). Serve para converter horários livres em vagas.',
+  'vagas': 'Quantos pacientes a mais cabem: horários livres ÷ horários que cada paciente usa na área.',
+  'lotacao maxima': 'Quantos pacientes a clínica (ou a área) comporta com a equipe ativa atual: os de hoje mais as vagas. No total da clínica, como o mesmo paciente faz várias terapias, a conta segue a proporção atual de pacientes por horário.',
+  'origem': 'De onde veio a capacidade: informada (à mão), carga horária (do Hipo ou do cadastro), turno na agenda (estimada) ou sem dados (preencha a carga).',
 };
 
 const infoKey = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')

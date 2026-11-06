@@ -52,7 +52,8 @@ function db(): PDO
 function migrar(PDO $pdo): void
 {
     $novas = [
-        'profissionais' => [['modalidade', "TEXT NOT NULL DEFAULT 'individual'"]],
+        'profissionais' => [['modalidade', "TEXT NOT NULL DEFAULT 'individual'"], ['hipo_id', 'INTEGER'], ['nome_completo', 'TEXT'],
+                            ['unidade', 'TEXT'], ['contratacao', 'TEXT'], ['capacidade_semanal', 'INTEGER']],
         'vinculos' => [['modalidade', 'TEXT'], ['grupo_id', 'INTEGER']],
         'saida_profissionais' => [['modalidade', 'TEXT'], ['grupo_id', 'INTEGER']],
     ];

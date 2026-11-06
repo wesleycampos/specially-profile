@@ -652,7 +652,7 @@ function importar_avaliacoes(string $bytes): array
 }
 
 const IMPORTADORES = ['saidas' => 'importar_saidas', 'ativos' => 'importar_ativos', 'profissionais' => 'importar_profissionais',
-                      'atendimentos' => 'importar_atendimentos', 'avaliacoes' => 'importar_avaliacoes'];
+                      'atendimentos' => 'importar_atendimentos', 'avaliacoes' => 'importar_avaliacoes', 'hipo' => 'importar_hipo'];
 
 // ------------------------------------------------------------------ escrita de xlsx (planilhas-modelo)
 function xml_esc($s): string

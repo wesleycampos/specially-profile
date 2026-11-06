@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Specially Profile</title>
 <meta name="robots" content="noindex,nofollow">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 <script src="vendor/chart.umd.min.js"></script>
 </head>
 <body>
@@ -15,6 +15,7 @@
   <a href="#ranking" data-s="ranking"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>Ranking</a>
   <a href="#agenda" data-s="agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M7 13h3M14 13h3M7 17h3"/></svg>Agenda</a>
   <a href="#profissionais" data-s="profissionais"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 14.5a5 5 0 0 1 6 5"/></svg>Equipe</a>
+  <a href="#lotacao" data-s="lotacao"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-6"/><circle cx="12" cy="18" r="1.5"/></svg>Lotação</a>
   <a href="#individual" data-s="individual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M5 21v-1a7 7 0 0 1 14 0v1"/><path d="M16 14l2 2 4-4"/></svg>Individual</a>
   <a href="#areas" data-s="areas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Áreas</a>
   <a href="#perdas" data-s="perdas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l6 6 4-4 8 8"/><path d="M21 11v6h-6"/></svg>Perdas</a>
@@ -180,6 +181,7 @@
           <option value="pct_faltas_saida">% saídas por faltas</option><option value="pct_evitaveis">% perdas evitáveis</option><option value="saidas_grupo">Perdas em grupo</option><option value="carteira">Maior carteira</option>
           <option value="nota">Melhor satisfação</option><option value="faturamento">Maior faturamento</option><option value="nome">Nome</option>
         </select>
+        <label>Situação</label><select id="pcSit"><option value="ativos">Ativos</option><option value="inativos">Inativos</option><option value="">Todos</option></select>
         <label><input type="checkbox" id="pcMov" checked> só com movimento</label>
       </div>
       <div class="hint" style="margin:8px 0 0">A linha vertical em cada barra é a média da área do profissional. Verde = melhor que a média, laranja = próximo, vermelho = pior.</div>
@@ -249,15 +251,25 @@
 
   <!-- CADASTROS -->
   <section class="section" id="s-cadastros">
+    <div class="card" style="padding:10px 14px"><div class="seg" id="cdTabs"></div></div>
+    <div id="cdPane"></div>
+  </section>
+
+  <!-- LOTAÇÃO -->
+  <section class="section" id="s-lotacao">
+    <div id="ltAviso"></div>
+    <div class="kpis" id="ltKpis"></div>
     <div class="card">
-      <div class="card-head"><div><h2>Profissionais</h2><div class="hint">Formação, registro, admissão, meta de carteira e competências. Clique para editar.</div></div>
-        <div class="filters"><input type="search" id="cdBusca" placeholder="Buscar…"><label><input type="checkbox" id="cdInativos"> mostrar inativos</label><button class="primary" id="cdNovo">+ Novo profissional</button></div></div>
-      <div class="tablewrap"><table id="cdTable"></table></div>
+      <div class="card-head"><div><h2>Lotação por área</h2><div class="hint">Horários de atendimento por semana dos terapeutas ativos, comparados com a grade real da semana no Hipo</div></div>
+        <div class="filters"><label>Unidade</label><select id="ltUni"></select></div></div>
+      <div class="tablewrap"><table id="ltAreas"></table></div>
     </div>
     <div class="card">
-      <h2>Convênios — valor por sessão</h2>
-      <div class="hint">Usado para calcular rentabilidade quando o atendimento importado não traz o valor</div>
-      <div class="tablewrap" style="max-width:560px"><table id="convTable"></table></div>
+      <div class="card-head"><div><h2>Capacidade por terapeuta</h2><div class="hint">Só ativos. Clique em <b>Carga</b> ou <b>Capacidade</b> para corrigir; o total é recalculado na hora.</div></div>
+        <div class="filters"><input type="search" id="ltBusca" placeholder="Buscar terapeuta…"><select id="ltEsp"></select>
+          <select id="ltFonte"><option value="">Todas as origens</option><option value="carga">Pela carga horária</option><option value="estimada">Estimada pelo turno</option><option value="manual">Informada à mão</option><option value="sem_dados">Sem dados</option><option value="apoio">Apoio (ABA)</option></select>
+          <button id="ltCsv">⬇ CSV</button></div></div>
+      <div class="tablewrap"><table id="ltProfs"></table></div>
     </div>
   </section>
 
@@ -269,7 +281,7 @@
 </div>
 
 <dialog id="dlg"></dialog>
-<script src="info.js?v=12"></script>
-<script src="app.js?v=12"></script>
+<script src="info.js?v=13"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>

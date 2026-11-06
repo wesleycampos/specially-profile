@@ -467,7 +467,7 @@ function profissional(int $pid): ?array
 }
 
 const CAMPOS_PROF = ['nome', 'especialidade_id', 'modalidade', 'formacao', 'pos_graduacao', 'registro_conselho', 'data_admissao',
-                     'carga_horaria_semanal', 'meta_pacientes', 'foto_url', 'ativo', 'observacoes'];
+                     'carga_horaria_semanal', 'meta_pacientes', 'foto_url', 'ativo', 'observacoes', 'nome_completo', 'unidade', 'contratacao', 'capacidade_semanal'];
 
 function salvar_prof(?int $pid, array $body): array
 {

@@ -130,12 +130,12 @@ function go(){
   if (!$('s-' + section)) section = 'visao';
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('on', s.id === 's-' + section));
   document.querySelectorAll('nav.side a[data-s]').forEach(a => a.classList.toggle('on', a.dataset.s === section));
-  const titles = {visao:'Visão geral do corpo clínico', ranking:'Ranking — melhores e piores', agenda:'Agenda — quem atende mais, novos e saídas', individual:'Painel individual', profissionais:'Equipe', areas:'Áreas / especialidades', perdas:'Perda de pacientes', pacientes:'Pacientes', satisfacao:'Satisfação', cadastros:'Cadastros', importar:'Importar dados'};
+  const titles = {visao:'Visão geral do corpo clínico', ranking:'Ranking — melhores e piores', agenda:'Agenda — quem atende mais, novos e saídas', individual:'Painel individual', profissionais:'Equipe', areas:'Áreas / especialidades', perdas:'Perda de pacientes', pacientes:'Pacientes', satisfacao:'Satisfação', cadastros:'Cadastros', importar:'Importar dados', lotacao:'Lotação — capacidade e ocupação da clínica'};
   $('title').textContent = titles[section];
   if (D) renderSection();
 }
 function renderSection(){
-  ({visao:rVisao, ranking:rRanking, agenda:rAgenda, individual:rIndividual, profissionais:rEquipe, areas:rAreas, perdas:rPerdas, pacientes:rPacientes, satisfacao:rSatisfacao, cadastros:rCadastros, importar:rImportar})[section]();
+  ({visao:rVisao, ranking:rRanking, agenda:rAgenda, individual:rIndividual, profissionais:rEquipe, areas:rAreas, perdas:rPerdas, pacientes:rPacientes, satisfacao:rSatisfacao, cadastros:rCadastros, importar:rImportar, lotacao:rLotacao})[section]();
 }
 
 /* ---------------- VISÃO GERAL ---------------- */
@@ -629,8 +629,8 @@ function profBullets(p){
   return h;
 }
 function rEquipe(){
-  const q = norm($('pcBusca').value), sort = $('pcSort').value, mov = $('pcMov').checked;
-  let list = D.profissionais.filter(p => (!mov || p.saidas || p.carteira || p.sessoes) &&
+  const q = norm($('pcBusca').value), sort = $('pcSort').value, mov = $('pcMov').checked, sit = $('pcSit').value;
+  let list = D.profissionais.filter(p => (!sit || (sit === 'ativos' ? p.ativo : !p.ativo)) && (!mov || p.saidas || p.carteira || p.sessoes) &&
     (!q || norm([p.nome, p.esp, p.formacao, p.pos, ...p.competencias.map(c => c.nome)].join(' ')).includes(q)));
   const key = sort.replace('_asc','');
   list.sort((a,b) => sort === 'nome' ? a.nome.localeCompare(b.nome) : sort.endsWith('_asc') ? (a[key] ?? 999) - (b[key] ?? 999) : (b[key] ?? -1) - (a[key] ?? -1));
@@ -846,12 +846,18 @@ function editProf(f){
         <option value="misto" ${f.modalidade==='misto'?'selected':''}>Individual e grupo (misto)</option>
         <option value="grupo" ${f.modalidade==='grupo'?'selected':''}>Só grupo — todas as perdas contam como grupo</option></select></label>
       <label>Situação<select name="ativo"><option value="1" ${f.ativo!==0?'selected':''}>Ativo</option><option value="0" ${f.ativo===0?'selected':''}>Inativo / desligado</option></select></label>
+      <label>Nome completo (Hipo)<input name="nome_completo" value="${v('nome_completo')}"></label>
+      <label>Unidade<input name="unidade" value="${v('unidade')}" list="dlUnidades" placeholder="Matriz, Vila…"></label>
+      <label>Contratação<select name="contratacao">${['', 'CLT', 'PJ', 'Temporário', 'Estágio'].map(o => `<option value="${o}" ${(f.contratacao || '') === o ? 'selected' : ''}>${o || '—'}</option>`).join('')}</select></label>
+      <label>Capacidade semanal (horários)<input type="number" name="capacidade_semanal" value="${v('capacidade_semanal')}" placeholder="vazio = calculada pela carga horária"></label>
+      <datalist id="dlUnidades"><option value="Matriz"><option value="Vila"></datalist>
       <label>Foto ${isNew ? '(salve primeiro)' : ''}<input type="file" id="pfoto" accept="image/*" ${isNew?'disabled':''}></label>
       <label class="full">Observações da coordenação<textarea name="observacoes">${v('observacoes')}</textarea></label>
       <div class="full" style="grid-column:1/-1"><div style="font-size:12px;font-weight:600;color:var(--text-2);margin:6px 0">Grupos que conduz</div><div id="grps"></div><button id="addGrp">+ grupo</button></div>
       <div class="full" style="grid-column:1/-1"><div style="font-size:12px;font-weight:600;color:var(--text-2);margin:6px 0">Competências e habilidades (nível 1 a 5)</div><div id="comps">${comps.map(compRow).join('')}</div><button id="addComp">+ competência</button></div>
     </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button id="mCancel">Cancelar</button><button class="primary" id="mSave">Salvar</button></div></div></div>`;
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">${isNew ? '' : '<button class="danger" id="mDel">Excluir</button><button id="mUnir">Unir com outro cadastro</button>'}<span style="flex:1"></span><button id="mCancel">Cancelar</button><button class="primary" id="mSave">Salvar</button></div></div></div>`;
+  if (!isNew) { $('mDel').onclick = e => { e.preventDefault(); excluirProf(f); }; $('mUnir').onclick = e => { e.preventDefault(); unirProf(f); }; }
   const sync = () => $('comps').querySelectorAll('.comp-row').forEach(r => { const c = comps[+r.dataset.i]; r.querySelectorAll('[data-f]').forEach(i => c[i.dataset.f] = i.value); });
   const redraw = () => { $('comps').innerHTML = comps.map(compRow).join(''); $('comps').querySelectorAll('[data-del]').forEach(b => b.onclick = e => { e.preventDefault(); sync(); comps.splice(+b.dataset.del, 1); redraw(); }); };
   redraw();
@@ -863,32 +869,278 @@ function editProf(f){
   $('mClose').onclick = $('mCancel').onclick = () => dlg.close();
   $('mSave').onclick = async () => {
     sync(); gsync();
-    const body = {}; $('pform').querySelectorAll('[name]').forEach(i => body[i.name] = i.value === '' ? null : (['especialidade_id','ativo','meta_pacientes'].includes(i.name) ? +i.value : i.name === 'carga_horaria_semanal' ? +i.value : i.value));
+    const body = {}; $('pform').querySelectorAll('[name]').forEach(i => body[i.name] = i.value === '' ? null : (['especialidade_id','ativo','meta_pacientes','capacidade_semanal'].includes(i.name) ? +i.value : i.name === 'carga_horaria_semanal' ? +i.value : i.value));
     if (!body.nome) return toast('Informe o nome');
     body.grupos = grps.filter(g => (g.nome || '').trim()).map(g => ({id:g.id || null, nome:g.nome, dia_horario:g.dia_horario || null, capacidade:g.capacidade ? +g.capacidade : null, ativo:+g.ativo}));
     body.competencias = comps.filter(c => c.nome.trim()).map(c => ({nome:c.nome, tipo:c.tipo, nivel:c.nivel ? +c.nivel : null}));
     const r = await api(isNew ? 'api/profissional' : 'api/profissional/' + f.id, {method: isNew ? 'POST' : 'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     const file = $('pfoto').files?.[0];
     if (file) await api(`api/profissional/${r.id}/foto`, {method:'POST', headers:{'Content-Type':file.type}, body:file});
-    toast('Cadastro salvo'); PROFS_ALL = null; await loadMeta(); await refresh(); openProf(r.id);
+    toast('Cadastro salvo'); await aposSalvar(); if (section === 'cadastros') rCadastros(); openProf(r.id);
   };
   if (!dlg.open) dlg.showModal();
 }
 
-/* ---------------- CADASTROS ---------------- */
+/* ---------------- CADASTROS (CRUD) ---------------- */
+let CRUD_S = null, CRUD_O = null, cdTab = 'profissionais';
+const cdState = {};
+const CD_TABS = [['profissionais','Profissionais'],['conciliacao','Conciliação Hipo'],['pacientes','Pacientes'],['vinculos','Carteira'],['saidas','Saídas'],
+  ['atendimentos','Atendimentos'],['avaliacoes','Avaliações'],['grupos','Grupos'],['especialidades','Áreas'],['convenios','Convênios'],['agenda_versoes','Agendas']];
+const JSONH = {'Content-Type':'application/json'};
+async function crudLoad(force){ if (!CRUD_S || !CRUD_O || force) [CRUD_S, CRUD_O] = await Promise.all([api('api/crud/schema'), api('api/crud/opcoes')]); }
+async function aposSalvar(){ PROFS_ALL = null; LT = null; await crudLoad(true); await loadMeta(); await refresh(); }
+const sitSel = (id, v) => `<select id="${id}"><option value="ativos" ${v==='ativos'?'selected':''}>Ativos</option><option value="inativos" ${v==='inativos'?'selected':''}>Inativos</option><option value="" ${!v?'selected':''}>Todos</option></select>`;
+
 async function rCadastros(){
+  $('cdTabs').innerHTML = CD_TABS.map(([k,l]) => `<button data-t="${k}" class="${k === cdTab ? 'on' : ''}">${l}</button>`).join('');
+  $('cdTabs').querySelectorAll('button').forEach(b => b.onclick = () => { cdTab = b.dataset.t; $('cdPane').innerHTML = ''; rCadastros(); });
+  const tab = cdTab;
+  await crudLoad();
+  if (tab !== cdTab || section !== 'cadastros') return;   // trocou de aba enquanto carregava
+  if (cdTab === 'profissionais') return cdProfissionais();
+  if (cdTab === 'conciliacao') return cdConciliacao();
+  return cdTabela(cdTab);
+}
+
+/* ----- profissionais ----- */
+async function cdProfissionais(){
+  const st = cdState.prof ??= {q:'', sit:'ativos', esp:''};
+  if (!$('cdBusca')) {
+    $('cdPane').innerHTML = `<div class="card">
+      <div class="card-head"><div><h2>Profissionais</h2><div class="hint">Cadastro completo. Clique numa linha para editar, excluir ou unir com outro cadastro.</div></div>
+        <div class="filters"><input type="search" id="cdBusca" placeholder="Buscar nome, registro, unidade…" value="${esc(st.q)}">
+          <label>Situação</label>${sitSel('cdSit', st.sit)}
+          <label>Área</label><select id="cdEsp"><option value="">Todas</option>${META.especialidades.map(e => `<option value="${e.id}" ${String(e.id)===st.esp?'selected':''}>${esc(e.nome)}</option>`).join('')}</select>
+          <button class="primary" id="cdNovo">+ Novo profissional</button></div></div>
+      <div class="hint" id="cdConta" style="margin:0 0 8px"></div>
+      <div class="tablewrap"><table id="cdTable"></table></div></div>`;
+    $('cdBusca').oninput = deb(() => { st.q = $('cdBusca').value; cdProfissionais(); });
+    $('cdSit').onchange = () => { st.sit = $('cdSit').value; cdProfissionais(); };
+    $('cdEsp').onchange = () => { st.esp = $('cdEsp').value; cdProfissionais(); };
+    $('cdNovo').onclick = () => editProf({especialidade_id: META.especialidades[0]?.id, ativo:1, competencias:[]});
+  }
   if (!PROFS_ALL) PROFS_ALL = await api('api/profissionais');
-  const q = norm($('cdBusca').value), ina = $('cdInativos').checked;
-  const l = PROFS_ALL.filter(p => (ina || p.ativo) && (!q || norm([p.nome, p.esp, p.formacao, p.registro_conselho].join(' ')).includes(q)));
-  $('cdTable').innerHTML = `<thead><tr><th>Profissional</th><th>Formação</th><th>Registro</th><th>Admissão</th><th class="num">Meta</th><th class="num">Competências</th><th class="num">Saídas (total)</th><th>Situação</th></tr></thead><tbody>` +
-    l.map(p => `<tr class="click" data-id="${p.id}"><td>${who({...p, esp_id:p.especialidade_id})}</td><td>${esc(p.formacao) || '<span style="color:var(--muted)">—</span>'}</td><td>${esc(p.registro_conselho) || '—'}</td><td>${dataL(p.data_admissao)}</td><td class="num">${p.meta_pacientes ?? '—'}</td><td class="num">${p.n_comp}</td><td class="num">${p.n_saidas}</td><td>${p.ativo ? 'Ativo' : '<span class="st-bad">Inativo</span>'}</td></tr>`).join('') + '</tbody>';
+  if (cdTab !== 'profissionais' || !$('cdTable')) return;
+  const q = norm(st.q);
+  const l = PROFS_ALL.filter(p => (!st.sit || (st.sit === 'ativos' ? p.ativo : !p.ativo)) && (!st.esp || String(p.especialidade_id) === st.esp) &&
+    (!q || norm([p.nome, p.nome_completo, p.esp, p.formacao, p.registro_conselho, p.unidade, p.contratacao].join(' ')).includes(q)));
+  $('cdConta').textContent = `${fmt(l.length)} profissionais${st.sit === 'ativos' ? ' ativos' : st.sit === 'inativos' ? ' inativos' : ''} · ${fmt(PROFS_ALL.filter(p => p.ativo).length)} ativos no total`;
+  const td = v => v == null || v === '' ? '<span style="color:var(--muted)">—</span>' : esc(v);
+  $('cdTable').innerHTML = `<thead><tr><th>Profissional</th><th>Nome no Hipo</th><th>Unidade</th><th>Contratação</th><th>Registro</th><th>Admissão</th><th class="num">Carga (h/sem)</th><th class="num">Saídas (total)</th><th>Situação</th></tr></thead><tbody>` +
+    l.map(p => `<tr class="click" data-id="${p.id}"><td>${who({...p, esp_id:p.especialidade_id})}</td><td>${td(p.nome_completo)}</td><td>${td(p.unidade)}</td><td>${td(p.contratacao)}</td><td>${td(p.registro_conselho)}</td><td>${dataC(p.data_admissao)}</td><td class="num">${fmt(p.carga_horaria_semanal)}</td><td class="num">${p.n_saidas}</td><td>${p.ativo ? 'Ativo' : '<span class="st-bad">Inativo</span>'}${p.hipo_id ? '' : ' <span class="tag" title="Sem cadastro correspondente no Hipo">sem Hipo</span>'}</td></tr>`).join('') + '</tbody>';
   $('cdTable').querySelectorAll('tr[data-id]').forEach(tr => tr.onclick = async () => editProf(await api('api/profissional/' + tr.dataset.id)));
-  $('convTable').innerHTML = `<thead><tr><th>Convênio</th><th class="num">Valor por sessão (R$)</th></tr></thead><tbody>` +
-    META.convenios.map(c => `<tr><td>${esc(c.nome)}</td><td class="num"><input type="number" step="0.01" data-c="${c.id}" value="${c.valor_sessao ?? ''}" style="width:120px;text-align:right"></td></tr>`).join('') + '</tbody>';
-  $('convTable').querySelectorAll('input').forEach(i => i.onchange = async () => {
-    await api('api/convenio/' + i.dataset.c, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({valor_sessao: i.value === '' ? null : +i.value})});
-    toast('Valor salvo'); await loadMeta();
+}
+
+async function excluirProf(f){
+  const dep = await api(`api/crud/profissionais/${f.id}/dependencias`);
+  const lista = Object.entries(dep).map(([k, n]) => `${n} ${k}`).join(', ');
+  if (!confirm(`Excluir ${f.nome} de vez?` + (lista ? `\n\nTambém serão apagados: ${lista}.\nSe for um cadastro duplicado, use "Unir com outro cadastro" para manter o histórico.` : ''))) return;
+  await api('api/profissional/' + f.id, {method:'DELETE'});
+  $('dlg').close(); toast('Profissional excluído'); await aposSalvar(); if (section === 'cadastros') rCadastros();
+}
+
+async function unirProf(f){
+  await crudLoad();
+  const dlg = $('dlg');
+  const ops = CRUD_O.profissionais.filter(o => o.id !== f.id);
+  dlg.innerHTML = `<div class="mhead"><h2 style="flex:1">Unir ${esc(f.nome)} com outro cadastro</h2><button class="ghost" id="mClose">✕</button></div>
+    <div class="mbody"><div class="card"><div class="hint" style="margin:0 0 10px">Use quando a mesma pessoa está cadastrada duas vezes. Saídas, carteira, agenda, atendimentos, avaliações, grupos e competências de <b>${esc(f.nome)}</b> passam para o cadastro escolhido, os campos vazios dele são completados e este cadastro é apagado.</div>
+      <div class="form-grid"><label class="full">Manter o cadastro de<input id="unirAlvo" list="dlUnir" placeholder="Digite o nome…" autocomplete="off"></label></div>
+      <datalist id="dlUnir">${ops.map(o => `<option value="${esc(o.label)}">`).join('')}</datalist>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button id="mCancel">Cancelar</button><button class="primary" id="mSave">Unir</button></div></div></div>`;
+  $('mClose').onclick = $('mCancel').onclick = () => dlg.close();
+  $('mSave').onclick = async () => {
+    const alvo = ops.find(o => o.label === $('unirAlvo').value);
+    if (!alvo) return toast('Escolha um profissional da lista');
+    if (!confirm(`Unir ${f.nome} em ${alvo.label}? Não dá para desfazer.`)) return;
+    const r = await api(`api/profissional/${f.id}/unir`, {method:'POST', headers:JSONH, body: JSON.stringify({para: alvo.id})});
+    dlg.close(); toast(`Cadastros unidos em ${alvo.label}`); await aposSalvar(); if (section === 'cadastros') rCadastros(); openProf(r.id);
+  };
+  if (!dlg.open) dlg.showModal();
+}
+
+/* ----- conciliação com o Hipo ----- */
+async function cdConciliacao(){
+  const st = cdState.conc ??= {inativos:false};
+  const c = await api('api/conciliacao' + (st.inativos ? '?inativos=1' : ''));
+  if (cdTab !== 'conciliacao') return;
+  const card = p => {
+    const sug = p.sugestoes.map(s => `<button class="unirSug" data-de="${p.id}" data-para="${s.id}" data-nome="${esc(s.nome_completo)}">Unir com <b>${esc(s.nome_completo)}</b> · ${esc(s.esp)}${s.unidade ? ' · ' + esc(s.unidade) : ''}${s.ativo ? '' : ' (inativo no Hipo)'}</button>`).join('');
+    return `<div class="card conc"><div class="card-head"><div><h3 style="margin:0">${esc(p.nome)}</h3><div class="hint" style="margin:2px 0 0">${esc(p.esp)} · ${p.vinculos} pacientes na carteira · ${p.saidas} saídas${p.na_agenda ? ' · está na agenda atual' : ''}${p.ativo ? '' : ' · <b class="st-bad">inativo</b>'}</div></div>
+      <div class="filters"><button class="concEdit" data-id="${p.id}">Editar</button><button class="concUnir" data-id="${p.id}">Unir com…</button>${p.ativo ? `<button class="concInat" data-id="${p.id}">Marcar inativo</button>` : ''}</div></div>
+      <div class="conc-sug">${sug || '<span class="hint" style="margin:0">Nenhum nome parecido no Hipo. Se a pessoa saiu, marque como inativa; se é nova, mantenha.</span>'}</div></div>`;
+  };
+  $('cdPane').innerHTML = `<div class="notice"><span>🔗</span><div>Profissionais do Profile que não foram encontrados no cadastro do Hipo. Una quando é a mesma pessoa escrita de outro jeito (o histórico é mantido); marque como inativo quando a pessoa já saiu.${c.importado_em ? ` Última importação do Hipo: ${dataL(c.importado_em.slice(0,10))}.` : ''}</div></div>
+    <div class="card" style="padding:10px 14px"><div class="filters"><b>${c.pendentes.length}</b>&nbsp;pendentes<label style="margin-left:12px"><input type="checkbox" id="concIna" ${st.inativos?'checked':''}> incluir inativos sem Hipo</label></div></div>
+    ${c.pendentes.map(card).join('') || '<div class="empty">Tudo conciliado: todos os ativos estão ligados ao Hipo.</div>'}`;
+  $('concIna').onchange = () => { st.inativos = $('concIna').checked; cdConciliacao(); };
+  const byId = id => c.pendentes.find(p => p.id === +id);
+  $('cdPane').querySelectorAll('.unirSug').forEach(b => b.onclick = async () => {
+    const p = byId(b.dataset.de);
+    if (!confirm(`Unir "${p.nome}" (${p.esp}) com ${b.dataset.nome}? O histórico passa para o cadastro do Hipo.`)) return;
+    await api(`api/profissional/${p.id}/unir`, {method:'POST', headers:JSONH, body: JSON.stringify({para: +b.dataset.para})});
+    toast('Cadastros unidos'); await aposSalvar(); cdConciliacao();
   });
+  $('cdPane').querySelectorAll('.concUnir').forEach(b => b.onclick = async () => unirProf(await api('api/profissional/' + b.dataset.id)));
+  $('cdPane').querySelectorAll('.concEdit').forEach(b => b.onclick = async () => editProf(await api('api/profissional/' + b.dataset.id)));
+  $('cdPane').querySelectorAll('.concInat').forEach(b => b.onclick = async () => {
+    await api('api/profissional/' + b.dataset.id, {method:'PUT', headers:JSONH, body: JSON.stringify({ativo:0})});
+    toast('Marcado como inativo'); await aposSalvar(); cdConciliacao();
+  });
+}
+
+/* ----- tabelas genéricas ----- */
+const dataC = d => d ? String(d).slice(0, 10).split('-').reverse().join('/') : '—';   // data completa (dataL mostra dia 1 como mês)
+const fkMap = t => Object.fromEntries((CRUD_O[t] || []).map(o => [o.label, o.id]));
+const fkLabel = (t, id) => (CRUD_O[t] || []).find(o => o.id === +id)?.label ?? '';
+function cdCelula(c, r){
+  const v = r[c.k];
+  if (c.t.startsWith('fk:') || c.t.startsWith('multi:')) return esc(r[c.k + '_rotulo'] ?? '') || '<span style="color:var(--muted)">—</span>';
+  if (c.t === 'bool') return v ? 'Sim' : 'Não';
+  if (c.t === 'date') return dataC(v);
+  if (c.t === 'num') return v == null ? '—' : fmt(v);
+  if (c.t === 'textarea') return esc(String(v ?? '').slice(0, 80)) + (String(v ?? '').length > 80 ? '…' : '');
+  return v == null || v === '' ? '<span style="color:var(--muted)">—</span>' : esc(String(v).replace(/_/g, ' '));
+}
+async function cdTabela(t){
+  const S = CRUD_S[t], st = cdState[t] ??= {q:'', pagina:0};
+  if (!$('crudBusca') || $('cdPane').dataset.t !== t) {
+    $('cdPane').dataset.t = t;
+    $('cdPane').innerHTML = `${S.aviso ? `<div class="notice"><span>ℹ️</span><div>${esc(S.aviso)}</div></div>` : ''}<div class="card">
+      <div class="card-head"><div><h2>${esc(S.titulo)}</h2><div class="hint" id="crudConta"></div></div>
+        <div class="filters"><input type="search" id="crudBusca" placeholder="Buscar…" value="${esc(st.q)}">${S.sem_criar ? '' : '<button class="primary" id="crudNovo">+ Novo</button>'}</div></div>
+      <div class="tablewrap"><table id="crudTable"></table></div>
+      <div class="filters pager" id="crudPager"></div></div>`;
+    $('crudBusca').oninput = deb(() => { st.q = $('crudBusca').value; st.pagina = 0; cdTabela(t); });
+    if (!S.sem_criar) $('crudNovo').onclick = () => crudForm(t, null);
+  }
+  const r = await api(`api/crud/${t}?` + new URLSearchParams({q: st.q, pagina: st.pagina, limite: 100}));
+  if (cdTab !== t || !$('crudTable')) return;
+  const cols = S.campos;
+  $('crudConta').textContent = `${fmt(r.total)} registros${st.q ? ' encontrados' : ''} · clique numa linha para editar ou excluir`;
+  $('crudTable').innerHTML = `<thead><tr>${cols.map(c => `<th>${esc(c.l)}</th>`).join('')}${t === 'agenda_versoes' ? '<th class="num">Horários</th>' : ''}</tr></thead><tbody>` +
+    (r.linhas.map(x => `<tr class="click" data-id="${x.id}">${cols.map(c => `<td>${cdCelula(c, x)}</td>`).join('')}${t === 'agenda_versoes' ? `<td class="num">${fmt(x.horarios)}</td>` : ''}</tr>`).join('')
+     || `<tr><td colspan="${cols.length + 1}" class="empty">Nenhum registro${st.q ? ' com essa busca' : ''}.</td></tr>`) + '</tbody>';
+  $('crudTable').querySelectorAll('tr[data-id]').forEach(tr => tr.onclick = () => crudForm(t, r.linhas.find(x => x.id === +tr.dataset.id)));
+  const pags = Math.ceil(r.total / r.limite);
+  $('crudPager').innerHTML = pags > 1 ? `<button id="pgAnt" ${st.pagina ? '' : 'disabled'}>‹ Anterior</button><span class="hint" style="margin:0">Página ${st.pagina + 1} de ${pags}</span><button id="pgProx" ${st.pagina + 1 < pags ? '' : 'disabled'}>Próxima ›</button>` : '';
+  if (pags > 1) { $('pgAnt').onclick = () => { st.pagina--; cdTabela(t); }; $('pgProx').onclick = () => { st.pagina++; cdTabela(t); }; }
+}
+
+function crudCampo(c, v){
+  const req = c.req ? ' required' : '', nm = `name="${c.k}"`, rot = esc(c.l) + (c.req ? ' *' : '');
+  if (c.t === 'textarea') return `<label class="full">${rot}<textarea ${nm}>${esc(v ?? '')}</textarea></label>`;
+  if (c.t === 'date') return `<label>${rot}<input type="date" ${nm} value="${esc(v ?? '')}"${req}></label>`;
+  if (c.t === 'int' || c.t === 'num') return `<label>${rot}<input type="number" step="${c.t === 'num' ? '0.01' : '1'}" ${nm} value="${v ?? ''}"${req}></label>`;
+  if (c.t === 'bool') return `<label>${rot}<select ${nm}><option value="1" ${v !== 0 ? 'selected' : ''}>Sim</option><option value="0" ${v === 0 ? 'selected' : ''}>Não</option></select></label>`;
+  if (c.t.startsWith('sel:')) { const ops = c.t.slice(4).split('|'); return `<label>${rot}<select ${nm}>${(c.req || ops.includes('') ? ops : ['', ...ops]).map(o => `<option value="${esc(o)}" ${String(v ?? '') === o ? 'selected' : ''}>${esc(o.replace(/_/g, ' ') || '—')}</option>`).join('')}</select></label>`; }
+  if (c.t.startsWith('fk:')) { const ref = c.t.slice(3); return `<label>${rot}<input ${nm} data-fk="${ref}" data-rot="${esc(c.l)}" list="dl_${ref}" value="${esc(v ? fkLabel(ref, v) : '')}" placeholder="Digite para buscar…" autocomplete="off"${req}></label>`; }
+  if (c.t.startsWith('multi:')) { const ref = c.t.slice(6); return `<div class="full" style="grid-column:1/-1"><div style="font-size:12px;font-weight:600;color:var(--text-2);margin:4px 0">${rot}</div>
+      <div id="multi_${c.k}" class="chips" data-ref="${ref}"></div><input data-multi="${c.k}" list="dl_${ref}" placeholder="Adicionar profissional…" autocomplete="off" style="margin-top:6px;width:100%"></div>`; }
+  return `<label>${rot}<input ${nm} value="${esc(v ?? '')}"${req}></label>`;
+}
+function crudForm(t, row){
+  const S = CRUD_S[t], isNew = !row, dlg = $('dlg');
+  const refs = [...new Set(S.campos.filter(c => /^(fk|multi):/.test(c.t)).map(c => c.t.split(':')[1]))];
+  const multi = {};
+  S.campos.filter(c => c.t.startsWith('multi:')).forEach(c => multi[c.k] = String(row?.[c.k] ?? '').split(',').filter(Boolean).map(Number));
+  const padrao = c => c.k === 'status' && t === 'pacientes' ? 'ativo' : c.t === 'bool' ? 1 : null;
+  dlg.innerHTML = `<div class="mhead"><h2 style="flex:1">${isNew ? 'Novo — ' : 'Editar — '}${esc(S.titulo)}</h2><button class="ghost" id="mClose">✕</button></div>
+    <div class="mbody"><div class="card"><form class="form-grid" id="crudForm" onsubmit="return false">${S.campos.map(c => crudCampo(c, row ? row[c.k] : padrao(c))).join('')}</form>
+      ${refs.map(r => `<datalist id="dl_${r}">${(CRUD_O[r] || []).map(o => `<option value="${esc(o.label)}">`).join('')}</datalist>`).join('')}
+      <div style="display:flex;gap:8px;margin-top:14px">${isNew ? '' : '<button class="danger" id="mDel">Excluir</button>'}<span style="flex:1"></span><button id="mCancel">Cancelar</button><button class="primary" id="mSave">Salvar</button></div></div></div>`;
+  const drawMulti = k => { const el = $('multi_' + k), ref = el.dataset.ref;
+    el.innerHTML = multi[k].map(id => `<span class="chip">${esc(fkLabel(ref, id))}<button data-rm="${id}" title="Tirar">✕</button></span>`).join('') || '<span class="hint" style="margin:0">Nenhum</span>';
+    el.querySelectorAll('[data-rm]').forEach(b => b.onclick = e => { e.preventDefault(); multi[k] = multi[k].filter(x => x !== +b.dataset.rm); drawMulti(k); }); };
+  Object.keys(multi).forEach(k => {
+    drawMulti(k);
+    const inp = dlg.querySelector(`[data-multi="${k}"]`), ref = $('multi_' + k).dataset.ref;
+    inp.onchange = () => { const id = fkMap(ref)[inp.value]; if (id && !multi[k].includes(id)) { multi[k].push(id); drawMulti(k); } inp.value = ''; };
+  });
+  $('mClose').onclick = $('mCancel').onclick = () => dlg.close();
+  $('mSave').onclick = async () => {
+    const body = {};
+    for (const el of $('crudForm').querySelectorAll('[name]')) {
+      if (el.dataset.fk) {
+        const v = el.value.trim();
+        if (v && !(v in fkMap(el.dataset.fk))) return toast(`Escolha um item da lista em "${el.dataset.rot}"`);
+        body[el.name] = v ? fkMap(el.dataset.fk)[v] : null;
+      } else body[el.name] = el.value === '' ? null : el.value;
+    }
+    Object.assign(body, multi);
+    try {
+      await api(isNew ? `api/crud/${t}` : `api/crud/${t}/${row.id}`, {method: isNew ? 'POST' : 'PUT', headers:JSONH, body: JSON.stringify(body)});
+    } catch (e) { return toast('Erro: ' + e.message, 6000); }
+    dlg.close(); toast(isNew ? 'Registro criado' : 'Alterações salvas'); await aposSalvar(); cdTabela(t);
+  };
+  if (!isNew) $('mDel').onclick = async () => {
+    const dep = await api(`api/crud/${t}/${row.id}/dependencias`);
+    const lista = Object.entries(dep).map(([k, n]) => `${n} ${k}`).join(', ');
+    if (!confirm('Excluir este registro de vez?' + (lista ? `\n\nTambém serão apagados: ${lista}.` : ''))) return;
+    try { await api(`api/crud/${t}/${row.id}`, {method:'DELETE'}); } catch (e) { return toast('Erro: ' + e.message, 7000); }
+    dlg.close(); toast('Registro excluído'); await aposSalvar(); cdTabela(t);
+  };
+  if (!dlg.open) dlg.showModal();
+}
+
+/* ---------------- LOTAÇÃO ---------------- */
+let LT = null, LT_UNI = '';
+const FONTE = {carga:'carga horária', estimada:'turno na agenda', manual:'informada', sem_dados:'sem dados', apoio:'apoio ABA'};
+const ocBar = v => v == null ? '—' : `<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><span>${pctf(v)}</span><span class="lt-bar"><i style="width:${Math.min(100, v)}%;background:${v >= 90 ? 'var(--bad)' : v >= 75 ? 'var(--warn)' : 'var(--good)'}"></i></span></div>`;
+async function rLotacao(){
+  if (!LT || LT.unidade !== LT_UNI) LT = await api('api/lotacao?unidade=' + encodeURIComponent(LT_UNI));
+  const L = LT, t = L.totais, ref = L.referencia;
+  $('ltUni').innerHTML = '<option value="">Todas</option>' + L.unidades.map(u => `<option ${u === LT_UNI ? 'selected' : ''}>${esc(u)}</option>`).join('');
+  if (!ref) {
+    $('ltAviso').innerHTML = `<div class="empty">A lotação usa a grade da semana do Hipo. <a class="btn primary" href="#importar">Importar o arquivo do Hipo</a></div>`;
+    ['ltKpis','ltAreas','ltProfs'].forEach(id => $(id).innerHTML = ''); return;
+  }
+  $('ltAviso').innerHTML = `<div class="notice"><span>📐</span><div>Semana de referência: <b>${dataL(ref.de)} a ${dataL(ref.ate)}</b> (grade do Hipo). Capacidade de cada terapeuta ativo: o valor informado à mão; senão a <b>carga horária</b> × ${fmt(L.parametros.sessoes_por_hora)} sessões por hora (grade de ${L.parametros.sessoes_dia} sessões em ${fmt(L.parametros.horas_dia)} h); senão o <b>turno que ele já faz</b> na agenda (do primeiro ao último horário de cada dia). Aplicadores ABA sem agenda própria ficam como apoio.${t.sem_dados ? ` <b>${t.sem_dados} ativos estão sem dados</b> — preencha a carga horária abaixo para o total ficar exato.` : ''}</div></div>`;
+  $('ltKpis').innerHTML =
+    kpi('users', 'Terapeutas ativos', fmt(t.ativos), `${t.com_agenda} com agenda · ${t.apoio} de apoio (ABA)`) +
+    kpi('cal', 'Capacidade semanal', fmt(t.capacidade) + ' <span style="font-size:13px;font-weight:400">horários</span>', `${t.estimados} estimadas pelo turno · ${t.sem_dados} sem dados`) +
+    kpi('cal', 'Horários ocupados', fmt(t.ocupados + t.bloqueados), `${fmt(t.bloqueados)} bloqueados · ${fmt(t.livres)} livres`) +
+    kpi('pct', 'Ocupação da capacidade', pctf(t.ocupacao), 'ocupados + bloqueados ÷ capacidade') +
+    kpi('users', 'Pacientes na semana', fmt(t.pacientes), `${fmt(t.sessoes)} sessões`) +
+    kpi('star', 'Lotação máxima', fmt(t.lotacao_pacientes) + ' <span style="font-size:13px;font-weight:400">pacientes</span>', t.vagas_pacientes != null ? `cabem mais ${fmt(t.vagas_pacientes)}` : '');
+  $('ltAreas').innerHTML = `<thead><tr><th>Área</th><th class="num">Ativos</th><th class="num">Com agenda</th><th class="num">Capacidade</th><th class="num">Ocupados</th><th class="num">Livres</th><th class="num">Uso da capacidade</th><th class="num">Pacientes</th><th class="num">Horários por paciente</th><th class="num">Vagas</th><th class="num">Lotação máxima</th></tr></thead><tbody>` +
+    L.areas.map(a => `<tr class="click" data-e="${a.id}"><td><span class="tag"><span class="sw" style="background:${espColor(a.id)}"></span>${esc(a.nome)}</span>${a.sem_dados ? ` <span class="st-warn" title="Ativos sem carga horária nem agenda">· ${a.sem_dados} sem dados</span>` : ''}${a.apoio ? ` <span style="color:var(--muted)">· ${a.apoio} apoio</span>` : ''}</td><td class="num">${a.ativos}</td><td class="num">${a.com_agenda}</td><td class="num">${fmt(a.capacidade)}</td><td class="num">${fmt(a.ocupados + a.bloqueados)}</td><td class="num">${fmt(a.livres)}</td><td class="num">${ocBar(a.ocupacao)}</td><td class="num">${fmt(a.pacientes)}</td><td class="num">${fmt(a.por_paciente)}</td><td class="num">${fmt(a.vagas_pacientes)}</td><td class="num"><b>${fmt(a.lotacao_pacientes)}</b></td></tr>`).join('') +
+    `<tr style="font-weight:650"><td>Clínica</td><td class="num">${t.ativos}</td><td class="num">${t.com_agenda}</td><td class="num">${fmt(t.capacidade)}</td><td class="num">${fmt(t.ocupados + t.bloqueados)}</td><td class="num">${fmt(t.livres)}</td><td class="num">${ocBar(t.ocupacao)}</td><td class="num">${fmt(t.pacientes)}</td><td class="num">${t.pacientes ? fmt(t.ocupados / t.pacientes) : '—'}</td><td class="num">${fmt(t.vagas_pacientes)}</td><td class="num">${fmt(t.lotacao_pacientes)}</td></tr></tbody>`;
+  $('ltAreas').querySelectorAll('tr[data-e]').forEach(tr => tr.onclick = () => { $('ltEsp').value = tr.dataset.e; rLtProfs(); $('ltProfs').scrollIntoView({behavior:'smooth', block:'start'}); });
+  const esps = [...new Map(L.profissionais.map(p => [p.esp_id, p.esp])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  const ev = $('ltEsp').value;
+  $('ltEsp').innerHTML = '<option value="">Todas as áreas</option>' + esps.map(([id, n]) => `<option value="${id}" ${String(id) === ev ? 'selected' : ''}>${esc(n)}</option>`).join('');
+  rLtProfs();
+}
+function ltFiltrados(){
+  const q = norm($('ltBusca').value), e = $('ltEsp').value, f = $('ltFonte').value;
+  return LT.profissionais.filter(p => (!e || String(p.esp_id) === e) && (!f || p.fonte === f) && (!q || norm([p.nome, p.nome_completo, p.unidade].join(' ')).includes(q)));
+}
+function rLtProfs(){
+  if (!LT) return;
+  const l = ltFiltrados();
+  $('ltProfs').innerHTML = `<thead><tr><th>Terapeuta</th><th>Unidade</th><th>Contratação</th><th class="num">Carga (h/sem)</th><th class="num">Capacidade</th><th>Origem</th><th class="num">Ocupados</th><th class="num">Bloq.</th><th class="num">Livres</th><th class="num">Uso da capacidade</th><th class="num">Sessões</th><th class="num">Pacientes</th></tr></thead><tbody>` +
+    (l.map(p => `<tr><td><a href="#" data-p="${p.id}" style="color:inherit;text-decoration:none">${who(p)}</a></td><td>${esc(p.unidade || '—')}</td><td>${esc(p.contratacao || '—')}</td>
+      <td class="num"><input type="number" class="mini-in" step="0.5" min="0" data-id="${p.id}" data-k="carga_horaria_semanal" value="${p.carga ?? ''}" placeholder="—" aria-label="Carga horária semanal de ${esc(p.nome)}"></td>
+      <td class="num"><input type="number" class="mini-in" step="1" min="0" data-id="${p.id}" data-k="capacidade_semanal" value="${p.fonte === 'manual' ? p.capacidade : ''}" placeholder="${p.capacidade ?? '—'}" title="Deixe vazio para calcular" aria-label="Capacidade semanal de ${esc(p.nome)}"></td>
+      <td><span class="tag fonte-${p.fonte}">${FONTE[p.fonte]}</span></td><td class="num">${p.ocupados}</td><td class="num">${p.bloqueados || ''}</td><td class="num">${fmt(p.livres)}</td><td class="num">${ocBar(p.ocupacao)}</td><td class="num">${p.sessoes}</td><td class="num">${p.pacientes}</td></tr>`).join('')
+     || '<tr><td colspan="12" class="empty">Nenhum terapeuta com esses filtros.</td></tr>') + '</tbody>';
+  bindProfClicks($('ltProfs'));
+  $('ltProfs').querySelectorAll('.mini-in').forEach(i => i.onchange = async () => {
+    const v = i.value === '' ? null : +i.value;
+    if (v != null && (v < 0 || (i.dataset.k === 'carga_horaria_semanal' && v > 80) || (i.dataset.k === 'capacidade_semanal' && v > 84))) { toast('Valor fora do esperado'); return; }
+    await api('api/profissional/' + i.dataset.id, {method:'PUT', headers:JSONH, body: JSON.stringify({[i.dataset.k]: v})});
+    toast('Salvo — lotação recalculada'); PROFS_ALL = null; LT = null; await rLotacao();
+  });
+}
+function csvLotacao(){
+  if (!LT) return;
+  const l = ltFiltrados(), q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const linhas = [['Terapeuta','Nome no Hipo','Área','Unidade','Contratação','Carga (h/sem)','Capacidade (horários)','Origem','Ocupados','Bloqueados','Livres','Ocupação %','Sessões','Pacientes'],
+    ...l.map(p => [p.nome, p.nome_completo, p.esp, p.unidade, p.contratacao, p.carga, p.capacidade, FONTE[p.fonte], p.ocupados, p.bloqueados, p.livres, p.ocupacao, p.sessoes, p.pacientes])];
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + linhas.map(r => r.map(q).join(';')).join('\n')], {type:'text/csv'}));
+  a.download = 'lotacao.csv'; a.click();
 }
 
 /* ---------------- IMPORTAR ---------------- */
@@ -898,14 +1150,15 @@ const IMPS = [
   {t:'profissionais', n:'Cadastro de profissionais', d:'O modelo já vem com todos os profissionais: preencha formação, registro, admissão, meta e competências.', c:'profissionais'},
   {t:'atendimentos', n:'Atendimentos / agenda', d:'Uma linha por sessão com status (realizado, falta…) e valor. Libera faltas, produtividade e faturamento.', c:'atendimentos'},
   {t:'avaliacoes', n:'Pesquisa de satisfação', d:'Notas de 0 a 10 por paciente e profissional. Libera NPS e satisfação.', c:'avaliacoes'},
+  {t:'hipo', n:'Cadastro do Hipo Saúde', d:'Arquivo <b>hipo-dados.json</b> extraído do Hipo. Casa cada terapeuta pelo nome, une cadastros duplicados, completa admissão, registro, carga horária, unidade e contratação (sem apagar o que já foi preenchido), atualiza quem está ativo e carrega a grade da semana usada na <b>Lotação</b>. Pode importar de novo sem duplicar.', c:'profissionais', json:true},
 ];
 function rImportar(){
   const c = META.contagens;
   const cnt = {saidas:c.saidas, ativos:META.ativos, profissionais:c.profissionais, atendimentos:c.atendimentos, avaliacoes:c.avaliacoes};
   $('impCards').innerHTML = IMPS.map(x => `<div class="card imp"><h2>${x.n}</h2><div class="hint" style="margin:0">${x.d}</div>
     <div class="count">${fmt(cnt[x.c])} <span style="font-size:13px;font-weight:400;color:var(--muted)">registros no banco</span></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="api/modelo?tipo=${x.t}">⬇ Baixar modelo</a>
-    <label class="btn primary">⬆ Importar planilha<input type="file" accept=".xlsx" data-t="${x.t}" hidden></label></div></div>`).join('');
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${x.json ? '' : `<a class="btn" href="api/modelo?tipo=${x.t}">⬇ Baixar modelo</a>`}
+    <label class="btn primary">⬆ Importar ${x.json ? 'arquivo' : 'planilha'}<input type="file" accept="${x.json ? '.json' : '.xlsx'}" data-t="${x.t}" hidden></label></div></div>`).join('');
   const unis = [...new Set([...(META.agenda || []).map(a => a.unidade), 'VILA', 'FELICITTÁ'])];
   const hoje = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   $('impCards').insertAdjacentHTML('afterbegin', `<div class="card imp"><h2>Agenda semanal da unidade</h2>
@@ -956,11 +1209,11 @@ $('agSalaModo').querySelectorAll('button').forEach(b => b.onclick = () => { sala
 $('agSalaSel').onchange = () => { salaValor[salaModo] = $('agSalaSel').value; $('agSalaProf').value = ''; rSala(); };
 $('agSalaProf').onchange = rSalaConteudo; $('agSalaBusca').oninput = deb(rSalaConteudo); $('agBusca').oninput = deb(rAgTabela); $('agLsBusca').oninput = deb(rAgLista); $('agCsv').onclick = csvAgenda;
 $('indBusca').oninput = deb(rIndividual);
-$('pcBusca').oninput = deb(rEquipe); $('pcSort').onchange = rEquipe; $('pcMov').onchange = rEquipe;
+$('pcBusca').oninput = deb(rEquipe); $('pcSort').onchange = rEquipe; $('pcMov').onchange = rEquipe; $('pcSit').onchange = rEquipe;
+$('ltUni').onchange = () => { LT_UNI = $('ltUni').value; rLotacao(); };
+$('ltBusca').oninput = deb(rLtProfs); $('ltEsp').onchange = rLtProfs; $('ltFonte').onchange = rLtProfs; $('ltCsv').onclick = csvLotacao;
 $('plBusca').oninput = deb(rPerdas);
 $('sdBusca').oninput = deb(rSaidasTable); $('sdMot').onchange = rSaidasTable; $('sdCsv').onclick = csvSaidas;
-$('cdBusca').oninput = deb(rCadastros); $('cdInativos').onchange = rCadastros;
-$('cdNovo').onclick = () => editProf({especialidade_id: META.especialidades[0]?.id, ativo:1, competencias:[]});
 $('theme').onclick = e => {
   e.preventDefault();
   const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;

@@ -7,6 +7,8 @@ require __DIR__ . '/lib/core.php';
 require __DIR__ . '/lib/importar.php';
 require __DIR__ . '/lib/painel.php';
 require __DIR__ . '/lib/agenda.php';
+require __DIR__ . '/lib/hipo.php';
+require __DIR__ . '/lib/crud.php';
 
 security_headers();
 set_time_limit(120);
@@ -62,6 +64,28 @@ try {
         if (preg_match('#^agenda/prof/(\d+)$#', $r, $m)) {
             send(200, agenda_profissional((int) $m[1]));
         }
+        if ($r === 'lotacao') {
+            send(200, lotacao($_GET));
+        }
+        if ($r === 'conciliacao') {
+            send(200, conciliacao(!empty($_GET['inativos'])));
+        }
+        if ($r === 'crud/schema') {
+            send(200, crud_schema());
+        }
+        if ($r === 'crud/opcoes') {
+            send(200, crud_opcoes());
+        }
+        if (preg_match('#^crud/([a-z_]+)/(\d+)/dependencias$#', $r, $m)) {
+            send(200, crud_dependencias($m[1], (int) $m[2]));
+        }
+        if (preg_match('#^crud/([a-z_]+)/(\d+)$#', $r, $m)) {
+            $x = crud_ler($m[1], (int) $m[2]);
+            send($x ? 200 : 404, $x ?? ['erro' => 'não encontrado']);
+        }
+        if (preg_match('#^crud/([a-z_]+)$#', $r, $m)) {
+            send(200, crud_listar($m[1], $_GET));
+        }
         if ($r === 'profissionais') {
             send(200, rows('SELECT p.*, e.nome esp, (SELECT COUNT(*) FROM competencias c WHERE c.profissional_id=p.id) n_comp,
                                    (SELECT COUNT(*) FROM saida_profissionais sp WHERE sp.profissional_id=p.id) n_saidas
@@ -107,6 +131,12 @@ try {
         if ($r === 'profissional') {
             send(200, salvar_prof(null, body_json()));
         }
+        if (preg_match('#^profissional/(\d+)/unir$#', $r, $m)) {
+            send(200, unir_profissionais((int) $m[1], (int) (body_json()['para'] ?? 0)));
+        }
+        if (preg_match('#^crud/([a-z_]+)$#', $r, $m)) {
+            send(200, crud_salvar($m[1], null, body_json()));
+        }
         if (preg_match('#^profissional/(\d+)/foto$#', $r, $m)) {
             $pid = (int) $m[1];
             $ext = ['image/png' => 'png', 'image/webp' => 'webp', 'image/jpeg' => 'jpg'][$_SERVER['CONTENT_TYPE'] ?? ''] ?? null;
@@ -137,14 +167,31 @@ try {
                 [$mod, $mod === 'grupo' ? (($b['grupo_id'] ?? null) ?: null) : null, (int) $m[1], (int) $m[2]]);
             send(200, ['ok' => true]);
         }
+        if (preg_match('#^crud/([a-z_]+)/(\d+)$#', $r, $m)) {
+            send(200, crud_salvar($m[1], (int) $m[2], body_json()));
+        }
         if (preg_match('#^convenio/(\d+)$#', $r, $m)) {
             $v = body_json()['valor_sessao'] ?? null;
             q('UPDATE convenios SET valor_sessao=? WHERE id=?', [is_numeric($v) ? (float) $v : null, (int) $m[1]]);
             send(200, ['ok' => true]);
         }
     }
+    if ($method === 'DELETE') {
+        if (preg_match('#^profissional/(\d+)$#', $r, $m)) {
+            foreach (glob(fotos_dir() . "/{$m[1]}.*") ?: [] as $old) {
+                @unlink($old);
+            }
+            send(200, crud_excluir('profissionais', (int) $m[1]));
+        }
+        if (preg_match('#^crud/([a-z_]+)/(\d+)$#', $r, $m)) {
+            send(200, crud_excluir($m[1], (int) $m[2]));
+        }
+    }
     send(404, ['erro' => 'não encontrado']);
 } catch (Throwable $e) {
+    if ($e instanceof InvalidArgumentException) {
+        send(400, ['erro' => $e->getMessage()]);   // dado inválido: não é falha do servidor
+    }
     error_log('[profile] ' . $e);
     send(500, ['erro' => $e instanceof RuntimeException || $e instanceof InvalidArgumentException ? $e->getMessage() : 'Erro interno ao processar a solicitação.']);
 }

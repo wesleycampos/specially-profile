@@ -324,17 +324,22 @@ function agenda_prof_id(string $nome, ?string $area, string $cabecalho, array &$
     if (isset($cache[$k])) {
         return [$cache[$k], false];
     }
-    $todos = rows('SELECT p.id, p.nome, e.nome esp FROM profissionais p JOIN especialidades e ON e.id=p.especialidade_id');
+    $todos = rows('SELECT p.id, p.nome, p.nome_completo, p.ativo, e.nome esp FROM profissionais p JOIN especialidades e ON e.id=p.especialidade_id');
+    // Com vários candidatos, os ativos têm preferência (o cadastro do Hipo trouxe também quem já saiu)
+    $ativosPrimeiro = function (array $l): array {
+        $at = array_values(array_filter($l, fn($r) => (int) $r['ativo'] === 1));
+        return $at ?: $l;
+    };
     // $amplo: também aceita o cadastro mais curto que o nome da agenda (GUSTAVO KHALIL p/ GUSTAVO KHALIL DA PAZ) — só dentro da área
-    $casa = function (array $lista, bool $amplo) use ($n): array {
-        $ex = array_values(array_filter($lista, fn($r) => norm($r['nome']) === $n));
+    $casa = function (array $lista, bool $amplo) use ($n, $ativosPrimeiro): array {
+        $ex = array_values(array_filter($lista, fn($r) => norm($r['nome']) === $n || norm((string) $r['nome_completo']) === $n));
         if ($ex) {
-            return $ex;
+            return $ativosPrimeiro($ex);
         }
         $pre = array_values(array_filter($lista, fn($r) => str_starts_with(norm($r['nome']), $n . ' ')
             || ($amplo && str_starts_with($n, norm($r['nome']) . ' '))));
         usort($pre, fn($a, $b) => strlen($b['nome']) <=> strlen($a['nome']));
-        return $pre;
+        return $ativosPrimeiro($pre);
     };
     $mesmaArea = $area ? $casa(array_filter($todos, fn($r) => $r['esp'] === $area), true) : [];
     $achou = $mesmaArea[0] ?? null;

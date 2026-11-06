@@ -35,6 +35,7 @@ Painel de gestão do corpo clínico. Mostra o desempenho dos profissionais, a pe
 | **Cadastro de profissionais** | Formação, registro, admissão, meta, competências, modalidade |
 | **Atendimentos** | Faltas por sessão e por paciente, produtividade, faturamento |
 | **Avaliações** | NPS e satisfação |
+| **Cadastro do Hipo Saúde** (`hipo-dados.json`) | Terapeutas com nome completo, unidade, contratação, admissão, registro e carga horária; quem está ativo; grade da semana para a aba **Lotação** |
 | **Agenda semanal** (uma por unidade) | Aba **Agenda**: quem atende mais/menos, pacientes novos, de saída, sem autorização, ocupação dos horários e vagas em grupo. Vira a carteira ativa (libera retenção e carteira) e aparece na ficha de cada profissional |
 
 Importar uma planilha sem nenhum paciente não apaga nada: o sistema recusa a importação.
@@ -63,3 +64,37 @@ Reimportar a planilha mantém as marcações feitas no painel. O filtro **Modali
   - **Sobrescrever**: corrige a agenda atual da unidade (mesma semana). A versão mais recente é apagada e trocada pela nova, sem histórico. O painel pede confirmação.
 - **Importe toda semana:** o painel compara a agenda atual com a anterior de cada unidade e mostra quem **saiu** e quem **entrou** na agenda de cada profissional. Quem saiu de todas as agendas vira paciente inativo.
 - **Profissionais novos:** quem não existe no cadastro é criado na área deduzida do cabeçalho (a importação avisa quais). Grafias diferentes: `AGENDA_PROF_ALIAS` em `web/lib/agenda.php`. Marcações e áreas: `AGENDA_MARCAS` e `AGENDA_AREAS` no mesmo arquivo.
+
+## Hipo Saúde: cadastro dos terapeutas e lotação
+O Hipo Saúde (https://specially.hiposaudeintegrada.com.br) vai ser descontinuado. Os dados foram extraídos uma vez, pelo navegador logado, e gravados em `dados/hipo/` (fora do Git):
+- `hipo-dados.json`: 464 usuários do Hipo (só os campos de cadastro, sem CPF nem endereço) e a grade da semana de 02 a 06/11/2026 (3.424 registros). É este arquivo que se importa.
+- **Importar:** aba **Importar** → *Cadastro do Hipo Saúde*. Faça o mesmo no site em produção para levar os dados para lá. Pode importar de novo sem duplicar.
+- **O que a importação faz:**
+  1. Casa cada terapeuta pelo nome. O Profile usa o nome curto ("Alice Marques") e o Hipo, o completo ("Alice Marques de Souza").
+  2. Une os cadastros duplicados: a mesma pessoa em duas áreas, ou com grafia levemente diferente (Luttienny × Luttieny). O histórico passa para o cadastro que fica, e o nome curto é mantido porque é o que as planilhas usam.
+  3. Completa os campos vazios: admissão, registro, carga horária, unidade e contratação.
+  4. Marca ativo ou inativo conforme o Hipo. Quem não tem par no Hipo e não está na agenda atual vira inativo, e o histórico continua.
+- **Conciliação:** aba **Cadastros → Conciliação Hipo** lista os ativos que ficaram sem par, com sugestões. Para cada um: **Unir** (é a mesma pessoa), **Marcar inativo** (já saiu) ou manter (é nova).
+- **Especialidades do Hipo → áreas do Profile:** `HIPO_ESP` em `web/lib/hipo.php`. Aplicador ABA vira Acompanhamento Terapêutico, Coordenador ABA vira Psicologia, Jiu-Jitsu vira Psicomotricidade e Pedagogia vira Psicopedagogia.
+
+### Lotação (aba Lotação)
+- **Capacidade de cada terapeuta ativo** (horários por semana). Vale a primeira regra que se aplicar:
+  1. O valor informado à mão (campo *Capacidade semanal*).
+  2. A carga horária × 1,3 sessão por hora. A grade do Hipo tem 14 sessões de 45 min das 08h às 20h.
+  3. O turno que ele já faz na agenda, do primeiro ao último horário de cada dia.
+- **Aplicadores ABA sem agenda própria** entram como apoio: atendem na agenda de outro terapeuta e não somam horários.
+- **Ocupação** = horários com paciente + bloqueados ÷ capacidade. Um horário de grupo conta uma vez.
+- **Lotação máxima** = pacientes de hoje + vagas. Vagas = horários livres ÷ horários que cada paciente usa na área.
+- **Ajuste fino:** na tabela *Capacidade por terapeuta*, preencha a carga horária ou a capacidade de quem está "sem dados". O total recalcula na hora.
+- Parâmetros: `LOT_SESSOES_DIA`, `LOT_HORAS_DIA` e `LOT_DIAS_MAX` em `web/lib/hipo.php`.
+
+## Cadastros (criar, editar, excluir)
+A aba **Cadastros** tem uma aba para cada tabela:
+- **Profissionais:** tela própria, com foto, competências e grupos. Tem **Excluir** e **Unir com outro cadastro** (junta duplicados sem perder histórico).
+- **Demais tabelas:** pacientes, carteira (vínculos), saídas, atendimentos, avaliações, grupos, áreas, convênios e agendas importadas.
+- **Onde se descreve cada tabela:** `crud_tabelas()` em `web/lib/crud.php` (campos, tipos e obrigatórios). A API e a tela usam essa mesma descrição.
+- **Exclusões:**
+  - Excluir um paciente ou profissional apaga o que depende dele. A tela mostra antes o que será apagado.
+  - Áreas e convênios em uso não podem ser excluídos.
+- **Registros criados à mão** ficam com origem `manual` e **não** são apagados quando a planilha correspondente é importada de novo. Os que vieram de planilha são refeitos a cada importação.
+

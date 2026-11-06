@@ -249,3 +249,23 @@ tr.sel td{background:var(--brand-soft)}
 .ii{display:inline-grid;place-items:center;width:15px;height:15px;margin-left:5px;border-radius:50%;border:1px solid var(--muted);color:var(--muted);font:italic 700 10px/1 Georgia,"Times New Roman",serif;cursor:help;vertical-align:1px;flex:none;text-transform:none;letter-spacing:0;user-select:none}
 .ii:hover,.ii:focus-visible{border-color:var(--brand);color:#fff;background:var(--brand);outline:none}
 .ii-tip{position:fixed;z-index:1000;background:var(--text);color:var(--surface);font-size:12.5px;line-height:1.45;font-weight:400;padding:9px 12px;border-radius:10px;box-shadow:0 8px 24px #0004;pointer-events:none;text-transform:none;letter-spacing:0}
+
+/* ---- lotação, cadastros (CRUD) e conciliação ---- */
+.lt-bar{display:inline-block;width:56px;height:6px;border-radius:4px;background:var(--surface-2);overflow:hidden;flex:none}
+.lt-bar i{display:block;height:100%;border-radius:4px}
+.mini-in{width:78px;text-align:right;padding:4px 6px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text);font:inherit}
+.mini-in:focus{outline:2px solid var(--brand);outline-offset:1px}
+.tag.fonte-sem_dados{color:var(--warn)} .tag.fonte-apoio{color:var(--muted)} .tag.fonte-manual{color:var(--brand-2)}
+button.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,var(--border))}
+button.danger:hover{background:color-mix(in srgb,var(--bad) 10%,var(--surface))}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:2px 4px 2px 10px;font-size:12.5px}
+.chip button{border:0;background:transparent;padding:0 4px;color:var(--muted)}
+.pager{justify-content:flex-end;margin-top:10px}
+.pager:empty{display:none}
+.conc{padding:12px 16px}
+.conc h3{font-size:15px}
+.conc-sug{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.conc-sug button{font-size:12.5px;text-align:left}
+#cdPane{display:grid;gap:14px}
+#cdTabs button{font-size:13px}

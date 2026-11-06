@@ -28,6 +28,11 @@ CREATE TABLE IF NOT EXISTS profissionais (
   foto_url               TEXT,
   ativo                  INTEGER NOT NULL DEFAULT 1,
   observacoes            TEXT,
+  hipo_id                INTEGER, -- id do usuário no Hipo Saúde (importação única do cadastro)
+  nome_completo          TEXT,
+  unidade                TEXT,   -- unidade principal no Hipo (Matriz / Vila)
+  contratacao            TEXT,   -- CLT | PJ | Temporário
+  capacidade_semanal     INTEGER, -- horários de atendimento por semana (sobrepõe o cálculo pela carga horária)
   UNIQUE (nome, especialidade_id)
 );
 
@@ -166,3 +171,29 @@ CREATE TABLE IF NOT EXISTS users (
   criado_em  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS login_attempts (ip TEXT NOT NULL, ts INTEGER NOT NULL);
+
+-- Configurações e referências gerais (valor em JSON)
+CREATE TABLE IF NOT EXISTS config (
+  chave  TEXT PRIMARY KEY,
+  valor  TEXT
+);
+
+-- Grade da semana exportada do Hipo Saúde (base da lotação). Substituída a cada importação.
+CREATE TABLE IF NOT EXISTS hipo_grade (
+  id             INTEGER PRIMARY KEY,   -- id da sessão no Hipo
+  data           TEXT,
+  dia_semana     INTEGER NOT NULL,      -- 0 = segunda ... 5 = sábado
+  hora_inicio    TEXT NOT NULL,
+  hora_fim       TEXT,
+  hipo_prof      INTEGER NOT NULL,      -- profissionais.hipo_id
+  hipo_paciente  INTEGER,
+  paciente       TEXT,
+  especialidade  TEXT,
+  unidade        TEXT,                  -- Matriz | Vila
+  tipo           TEXT NOT NULL,         -- consulta | bloqueio
+  tipo_agenda    TEXT,
+  convenio       TEXT,
+  sala           TEXT,
+  motivo         TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_hipo_grade_prof ON hipo_grade(hipo_prof);
