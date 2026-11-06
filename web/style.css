@@ -271,3 +271,27 @@ button.danger:hover{background:color-mix(in srgb,var(--bad) 10%,var(--surface))}
 #cdTabs button{font-size:13px}
 .pc-conta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 12px}
 .pc-conta .seg b{margin-left:4px}
+
+/* grade da semana: três visões */
+.ag-leg{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--text-2);margin:6px 0 8px}
+.gc{display:inline-block;font-size:11.5px;line-height:1.3;padding:2px 7px;margin:0 3px 3px 0;border-radius:6px;background:var(--surface-2);border:1px solid var(--border);white-space:nowrap}
+.gc.nv{background:color-mix(in srgb,var(--good) 16%,var(--surface));border-color:color-mix(in srgb,var(--good) 45%,var(--border))}
+.gc.sd{background:color-mix(in srgb,var(--bad) 14%,var(--surface));border-color:color-mix(in srgb,var(--bad) 45%,var(--border))}
+.gc.aj{background:color-mix(in srgb,var(--warn) 14%,var(--surface));border-color:color-mix(in srgb,var(--warn) 45%,var(--border))}
+.gc.grp{border-left:3px solid var(--brand)}
+.gc.vg{background:transparent;border-style:dashed;color:var(--muted)}
+.agter td{min-width:120px}
+.agter td.agter-who{min-width:190px;position:sticky;left:0;background:var(--surface);z-index:1}
+.agter-res{font-size:11.5px;color:var(--muted);margin-top:2px}
+.agmapa td{padding:3px;min-width:84px}
+.mc{display:grid;width:100%;padding:6px 4px;border:0;border-radius:8px;text-align:center;line-height:1.2;color:var(--text)}
+.mc small{font-size:10.5px;opacity:.85}
+.mc.sel{outline:2px solid var(--text);outline-offset:1px}
+.agdet{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px}
+.agdet .agc+.agc{margin-top:0}
+.aghora td{min-width:170px}
+.agl{font-size:12px;line-height:1.45;padding:1px 0;border-bottom:1px dotted var(--grid)}
+.agl.grp{border-left:3px solid var(--brand);padding-left:5px}
+.agl.vg{color:var(--muted);font-style:italic;border-bottom:0}
+.agu{font-size:10.5px;color:var(--muted)}
+.agver{margin-top:4px;padding:2px 8px;font-size:11.5px}

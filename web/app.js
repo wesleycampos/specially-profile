@@ -424,22 +424,98 @@ function rSalaConteudo(){
     pl.map(p => `<tr><td><b>${esc(p.nome)}</b> ${[...p.flags].map(agTag).join(' ')}</td><td style="font-size:12px">${p.horarios.map(esc).join(', ')}</td><td style="font-size:12px">${[...p.ters].map(esc).join(', ')}</td></tr>`).join('') + '</tbody>'
     : '<tr><td class="empty">Nenhum paciente</td></tr>';
 
-  // grade semanal: hora × dia, cada horário com o terapeuta e os pacientes
-  const dias = [1,2,3,4,5,6].filter(d => slots.some(s => s.dia === d));
-  const horas = [...new Set(slots.map(s => s.hora))].sort();
+  GRADE_SLOTS = slots; GRADE_UNI = uni; GRADE_BUSCA = !!q;
+  rGrade();
+}
+
+/* ---------------- grade da semana: três visões ----------------
+   Por terapeuta (linha = terapeuta, coluna = dia), Ocupação (mapa hora × dia, clique abre o horário) e Grade (hora × dia enxuta). */
+let GRADE_SLOTS = [], GRADE_UNI = '', GRADE_BUSCA = false, gradeCel = null;
+let gradeModo = (() => { try { return localStorage.getItem('agGradeModo') || 'terapeuta'; } catch { return 'terapeuta'; } })();
+const agFlags = p => Object.keys(agBadge).filter(k => +p[k]);
+const nomeCurto = n => { const w = String(n || '').trim().split(/\s+/); return w.length > 2 ? `${w[0]} ${w[w.length - 1]}` : w.join(' '); };
+function gradeSlots(){
+  const soMarc = $('agSoMarc').checked, vagos = $('agVagos').checked && !GRADE_BUSCA;
+  return GRADE_SLOTS.filter(s => s.pacientes.length ? (!soMarc || s.pacientes.some(p => agFlags(p).length)) : (vagos && !soMarc && s.situacao !== 'fechado'));
+}
+function rGrade(){
+  $('agGradeModo').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === gradeModo));
+  $('agGradeLeg').innerHTML = gradeModo === 'mapa'
+    ? '<span>Cada horário mostra <b>ocupados / total</b> (fechados não contam). Cor mais forte = mais cheio. Clique num horário para ver quem atende.</span>'
+    : `<span class="gc nv">novo</span><span class="gc sd">de saída</span><span class="gc aj">ajuste / retorno / sem aut.</span><span class="gc grp">grupo</span><span class="gc vg">vago</span>`;
+  const slots = gradeSlots();
+  const box = $('agGradeBox');
+  if (!slots.length) { box.innerHTML = '<div class="empty">Nenhum horário com esses filtros.</div>'; return; }
+  const dias = [1,2,3,4,5,6].filter(d => GRADE_SLOTS.some(s => s.dia === d));
+  if (gradeModo === 'terapeuta') return gradeTerapeuta(box, slots, dias);
+  if (gradeModo === 'mapa') return gradeMapa(box, dias);
+  return gradeHora(box, slots, dias);
+}
+// fichinha de um horário: "08:00 Heitor", colorida pela marcação
+function gradeChips(s){
+  const t = esc(s.hora);
+  if (!s.pacientes.length) return `<span class="gc vg" title="Horário vago${s.sala_nome ? ' · ' + esc(s.sala_nome) : ''}">${t} vago</span>`;
+  const cls = p => { const f = agFlags(p); return f.includes('saida') ? 'sd' : f.includes('novo') ? 'nv' : f.length ? 'aj' : ''; };
+  const tip = p => esc(p.nome) + (agFlags(p).length ? ' · ' + agFlags(p).map(k => agBadge[k][0]).join(', ') : '');
+  if (s.modalidade === 'grupo') {
+    const f = s.pacientes.map(cls).find(Boolean) || '';
+    return `<span class="gc grp ${f}" title="${esc(s.sala_nome || '')} · grupo: ${s.pacientes.map(tip).join('; ')}">${t} grupo (${s.pacientes.length})</span>`;
+  }
+  return s.pacientes.map(p => `<span class="gc ${cls(p)}" title="${tip(p)}${s.sala_nome ? ' · ' + esc(s.sala_nome) : ''}">${t} ${esc(nomeCurto(p.nome))}</span>`).join('');
+}
+function gradeTerapeuta(box, slots, dias){
+  const T = {};
+  slots.forEach(s => {
+    const t = T[s.prof_id] ??= {id:s.prof_id, nome:s.prof, esp:s.esp, esp_id:s.esp_id, foto_url:s.foto, unis:new Set(), dias:{}, pac:new Set(), ocup:0, vagos:0};
+    t.unis.add(s.unidade); (t.dias[s.dia] ??= []).push(s);
+    if (s.pacientes.length) { t.ocup++; s.pacientes.forEach(p => t.pac.add(p.paciente_id)); } else t.vagos++;
+  });
+  const L = Object.values(T).sort((a, b) => a.nome.localeCompare(b.nome));
+  box.innerHTML = `<div class="tablewrap" style="max-height:680px"><table class="aggrid agter"><thead><tr><th>Terapeuta</th>${dias.map(d => `<th>${DIAS[d]}</th>`).join('')}</tr></thead><tbody>` +
+    L.map(t => `<tr><td class="agter-who"><a href="#" data-p="${t.id}" style="color:inherit;text-decoration:none">${who({...t, esp: t.esp + (GRADE_UNI ? '' : ' · ' + [...t.unis].join('/'))})}</a>
+        <div class="agter-res">${t.pac.size} pacientes · ${t.ocup} horários${t.vagos ? ` · <span class="st-warn">${t.vagos} vagos</span>` : ''}${t.ocup + t.vagos ? ` · ${Math.round(100 * t.ocup / (t.ocup + t.vagos))}%` : ''}</div></td>` +
+      dias.map(d => `<td>${(t.dias[d] || []).sort((a, b) => a.hora.localeCompare(b.hora)).map(gradeChips).join('') || '<span style="color:var(--muted)">—</span>'}</td>`).join('') + '</tr>').join('') +
+    '</tbody></table></div>';
+  bindProfClicks(box);
+}
+function gradeMapa(box, dias){
+  const base = GRADE_SLOTS.filter(s => s.situacao !== 'fechado');
+  const soMarc = $('agSoMarc').checked;
+  const horas = [...new Set(base.map(s => s.hora))].sort();
   const cel = (d, h) => {
-    const ss = slots.filter(s => s.dia === d && s.hora === h);
-    const ocup = ss.filter(s => s.pacientes.length).map(s => `<div class="agc ${s.modalidade === 'grupo' ? 'grp' : ''}" title="${esc(s.sala_nome)}${s.aplicadores ? ' · ' + esc(s.aplicadores) : ''}">
-      <div class="agt">${esc(s.prof)}${uni ? '' : ` <span>${esc(s.unidade)}</span>`}${s.modalidade === 'grupo' ? ' <span>· grupo</span>' : ''}</div>
-      ${s.pacientes.map(p => `<div>${esc(p.nome)} ${flags(p).map(agTag).join(' ')}</div>`).join('')}</div>`).join('');
-    const livres = q ? [] : ss.filter(s => !s.pacientes.length);
-    const vag = livres.filter(s => s.situacao === 'vago'), fec = livres.filter(s => s.situacao === 'fechado');
-    return ocup + (vag.length ? `<div class="agc vago" title="${esc(vag.map(s => s.prof).join(', '))}">vago: ${esc(vag.map(s => s.prof.split(' ')[0]).join(', '))}</div>` : '')
-      + (fec.length ? `<div class="agc fech" title="${esc(fec.map(s => s.prof).join(', '))}">fechado: ${esc(fec.map(s => s.prof.split(' ')[0]).join(', '))}</div>` : '');
+    const ss = base.filter(s => s.dia === d && s.hora === h);
+    const oc = ss.filter(s => s.pacientes.length), marc = oc.filter(s => s.pacientes.some(p => agFlags(p).length));
+    return {tot: ss.length, oc: oc.length, marc: marc.length, pac: oc.reduce((n, s) => n + s.pacientes.length, 0)};
   };
-  $('agSalaGrade').innerHTML = horas.length ? `<thead><tr><th>Hora</th>${dias.map(d => `<th>${DIAS[d]}</th>`).join('')}</tr></thead><tbody>` +
-    horas.map(h => `<tr><td class="num"><b>${h}</b></td>${dias.map(d => `<td>${cel(d, h)}</td>`).join('')}</tr>`).join('') + '</tbody>'
-    : '<tr><td class="empty">Nenhum horário</td></tr>';
+  box.innerHTML = `<div class="tablewrap" style="max-height:520px"><table class="agmapa"><thead><tr><th>Hora</th>${dias.map(d => `<th>${DIAS[d]}</th>`).join('')}</tr></thead><tbody>` +
+    horas.map(h => `<tr><td class="num"><b>${h}</b></td>${dias.map(d => { const c = cel(d, h); if (!c.tot) return '<td></td>';
+      const r = c.oc / c.tot, sel = gradeCel && gradeCel[0] === d && gradeCel[1] === h;
+      return `<td><button class="mc ${sel ? 'sel' : ''}" data-d="${d}" data-h="${h}" style="background:color-mix(in srgb, var(--brand) ${Math.round(12 + 70 * r)}%, var(--surface))${r > 0.55 ? ';color:#fff' : ''}" title="${c.oc} de ${c.tot} horários ocupados · ${c.pac} pacientes${c.marc ? ' · ' + c.marc + ' com marcação' : ''}">
+        <b>${c.oc}/${c.tot}</b><small>${soMarc ? (c.marc ? c.marc + ' marc.' : '—') : c.pac + ' pac'}</small></button></td>`; }).join('')}</tr>`).join('') +
+    `</tbody></table></div><div id="agMapaDet"></div>`;
+  box.querySelectorAll('.mc').forEach(b => b.onclick = () => { gradeCel = [+b.dataset.d, b.dataset.h]; gradeMapa(box, dias); });
+  if (gradeCel) {
+    const [d, h] = gradeCel, ss = gradeSlots().filter(s => s.dia === d && s.hora === h).sort((a, b) => a.prof.localeCompare(b.prof));
+    $('agMapaDet').innerHTML = `<div class="card-head" style="margin-top:12px"><h3 class="agsub" style="margin:0">${DIAS[d]} · ${esc(h)} — ${ss.filter(s => s.pacientes.length).length} ocupados</h3><button id="agMapaFecha">Fechar</button></div>
+      <div class="agdet">${ss.map(s => `<div class="agc ${s.modalidade === 'grupo' ? 'grp' : ''} ${s.pacientes.length ? '' : 'vago'}"><div class="agt">${esc(s.prof)}${GRADE_UNI ? '' : ` <span>${esc(s.unidade)}</span>`}</div>${s.pacientes.length ? s.pacientes.map(p => `<div>${esc(p.nome)} ${agFlags(p).map(agTag).join(' ')}</div>`).join('') : 'vago'}</div>`).join('') || '<div class="empty">Nada neste horário com esses filtros.</div>'}</div>`;
+    $('agMapaFecha').onclick = () => { gradeCel = null; gradeMapa(box, dias); };
+  }
+}
+function gradeHora(box, slots, dias){
+  const horas = [...new Set(slots.map(s => s.hora))].sort();
+  const MAX = 6;
+  const cel = (d, h) => {
+    const ss = slots.filter(s => s.dia === d && s.hora === h).sort((a, b) => a.prof.localeCompare(b.prof));
+    const linhas = ss.filter(s => s.pacientes.length).map(s => `<div class="agl ${s.modalidade === 'grupo' ? 'grp' : ''}"><b>${esc(nomeCurto(s.prof))}</b>${GRADE_UNI ? '' : ` <span class="agu">${esc(s.unidade)}</span>`} · ${s.modalidade === 'grupo'
+        ? `<span title="${esc(s.pacientes.map(p => p.nome).join(', '))}">grupo (${s.pacientes.length})</span> ${[...new Set(s.pacientes.flatMap(agFlags))].map(agTag).join(' ')}`
+        : s.pacientes.map(p => `${esc(nomeCurto(p.nome))} ${agFlags(p).map(agTag).join(' ')}`).join(', ')}</div>`);
+    const vag = ss.filter(s => !s.pacientes.length);
+    if (vag.length) linhas.push(`<div class="agl vg" title="${esc(vag.map(s => s.prof).join(', '))}">vago: ${esc(vag.map(s => nomeCurto(s.prof).split(' ')[0]).join(', '))}</div>`);
+    return linhas.length > MAX + 1 ? `<div class="agcel">${linhas.slice(0, MAX).join('')}<div class="agmais" hidden>${linhas.slice(MAX).join('')}</div><button class="agver">+${linhas.length - MAX} mais</button></div>` : linhas.join('');
+  };
+  box.innerHTML = `<div class="tablewrap" style="max-height:680px"><table class="aggrid aghora"><thead><tr><th>Hora</th>${dias.map(d => `<th>${DIAS[d]}</th>`).join('')}</tr></thead><tbody>` +
+    horas.map(h => `<tr><td class="num"><b>${h}</b></td>${dias.map(d => `<td>${cel(d, h)}</td>`).join('')}</tr>`).join('') + '</tbody></table></div>';
+  box.querySelectorAll('.agver').forEach(b => b.onclick = () => { const m = b.previousElementSibling; m.hidden = !m.hidden; b.textContent = m.hidden ? `+${m.children.length} mais` : 'mostrar menos'; });
 }
 function rAgLista(){
   const nome = id => AG.profissionais.find(p => p.id === id)?.nome || '—';
@@ -1249,7 +1325,9 @@ $('agUni').onchange = async () => { AG = await api('api/agenda?' + agQs()); merg
 $('agAT').onchange = rAgenda;
 $('agSalaModo').querySelectorAll('button').forEach(b => b.onclick = () => { salaModo = b.dataset.m; rSala(); });
 $('agSalaSel').onchange = () => { salaValor[salaModo] = $('agSalaSel').value; $('agSalaProf').value = ''; rSala(); };
-$('agSalaProf').onchange = rSalaConteudo; $('agSalaBusca').oninput = deb(rSalaConteudo); $('agBusca').oninput = deb(rAgTabela); $('agLsBusca').oninput = deb(rAgLista); $('agCsv').onclick = csvAgenda;
+$('agSalaProf').onchange = rSalaConteudo;
+$('agGradeModo').querySelectorAll('button').forEach(b => b.onclick = () => { gradeModo = b.dataset.v; try { localStorage.setItem('agGradeModo', gradeModo); } catch {} rGrade(); });
+$('agSoMarc').onchange = rGrade; $('agVagos').onchange = rGrade; $('agSalaBusca').oninput = deb(rSalaConteudo); $('agBusca').oninput = deb(rAgTabela); $('agLsBusca').oninput = deb(rAgLista); $('agCsv').onclick = csvAgenda;
 $('indBusca').oninput = deb(rIndividual);
 $('pcBusca').oninput = deb(rEquipe); $('pcSort').onchange = rEquipe; $('pcMov').onchange = rEquipe; $('pcSit').onchange = rEquipe;
 $('ltUni').onchange = () => { LT_UNI = $('ltUni').value; rLotacao(); };
