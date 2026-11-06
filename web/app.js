@@ -122,7 +122,7 @@ async function refresh(){
   [D, AG] = await Promise.all([api('api/dashboard?' + qs()), api('api/agenda?' + agQs())]);
   mergeAgenda();
   const c = META.contagens;
-  $('sub').textContent = `${c.profissionais} profissionais · ${c.pacientes} pacientes · ${c.saidas} saídas · ${c.atendimentos} atendimentos · ${c.avaliacoes} avaliações`;
+  $('sub').textContent = `${c.profissionais} profissionais (${fmt(c.profissionais_ativos)} ativos · ${fmt(c.profissionais - c.profissionais_ativos)} inativos) · ${c.pacientes} pacientes · ${c.saidas} saídas · ${c.atendimentos} atendimentos · ${c.avaliacoes} avaliações`;
   renderSection();
 }
 function go(){
@@ -630,8 +630,18 @@ function profBullets(p){
 }
 function rEquipe(){
   const q = norm($('pcBusca').value), sort = $('pcSort').value, mov = $('pcMov').checked, sit = $('pcSit').value;
-  let list = D.profissionais.filter(p => (!sit || (sit === 'ativos' ? p.ativo : !p.ativo)) && (!mov || p.saidas || p.carteira || p.sessoes) &&
+  // filtros de busca e movimento primeiro: os totais por situação respeitam esses filtros
+  const base = D.profissionais.filter(p => (!mov || p.saidas || p.carteira || p.sessoes) &&
     (!q || norm([p.nome, p.esp, p.formacao, p.pos, ...p.competencias.map(c => c.nome)].join(' ')).includes(q)));
+  let list = base.filter(p => !sit || (sit === 'ativos' ? p.ativo : !p.ativo));
+  const nAt = base.filter(p => p.ativo).length, nIn = base.length - nAt;
+  $('pcConta').innerHTML = `<div class="seg" role="group" aria-label="Situação">${[['ativos', 'Ativos', nAt], ['inativos', 'Inativos', nIn], ['', 'Todos', base.length]]
+      .map(([v, l, n]) => `<button data-sit="${v}" class="${sit === v ? 'on' : ''}">${l} <b>${fmt(n)}</b></button>`).join('')}</div>` +
+    `<span class="hint" style="margin:0">${[$('fEsp').value ? 'na área escolhida' : '', mov ? 'só com movimento no período' : '', q ? 'na busca' : ''].filter(Boolean).join(' · ')}` +
+    `${list.length > 120 ? `${mov || q || $('fEsp').value ? ' · ' : ''}mostrando os 120 primeiros de ${fmt(list.length)}` : ''}</span>` +
+    (!mov && !q && sit !== 'ativos' && D.cadastro && D.cadastro.inativos > nIn
+      ? `<span class="hint" style="margin:0">+ ${fmt(D.cadastro.inativos - nIn)} inativos sem nenhum movimento ficam de fora (sem dados para mostrar) — veja todos em <a href="#cadastros">Cadastros</a></span>` : '');
+  $('pcConta').querySelectorAll('[data-sit]').forEach(b => b.onclick = () => { $('pcSit').value = b.dataset.sit; rEquipe(); });
   const key = sort.replace('_asc','');
   list.sort((a,b) => sort === 'nome' ? a.nome.localeCompare(b.nome) : sort.endsWith('_asc') ? (a[key] ?? 999) - (b[key] ?? 999) : (b[key] ?? -1) - (a[key] ?? -1));
   $('pcards').innerHTML = list.slice(0, 120).map(p => `

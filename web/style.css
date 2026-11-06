@@ -269,3 +269,5 @@ button.danger:hover{background:color-mix(in srgb,var(--bad) 10%,var(--surface))}
 .conc-sug button{font-size:12.5px;text-align:left}
 #cdPane{display:grid;gap:14px}
 #cdTabs button{font-size:13px}
+.pc-conta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+.pc-conta .seg b{margin-left:4px}

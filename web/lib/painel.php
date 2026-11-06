@@ -401,6 +401,9 @@ function dashboard(array $q): array
         'convenios' => $convenios,
         'serie' => $serie,
         'profissionais' => $listaOut,
+        // cadastro inteiro por situação (na área filtrada): a lista acima só traz inativos que tiveram movimento
+        'cadastro' => ['ativos' => count(array_filter($profs, fn($p) => $p['ativo'] && $profOk($p['id']))),
+                       'inativos' => count(array_filter($profs, fn($p) => !$p['ativo'] && $profOk($p['id'])))],
         'areas' => $areas,
         'saidas' => array_map(fn($s) => [
             'id' => $s['id'], 'data' => $s['data_saida'], 'paciente' => $pacs[$s['paciente_id']]['nome'], 'paciente_id' => $s['paciente_id'],
@@ -436,7 +439,7 @@ function meta(): array
         'especialidades' => rows('SELECT * FROM especialidades ORDER BY nome'),
         'convenios' => rows('SELECT * FROM convenios ORDER BY nome'),
         'meses' => array_column(rows('SELECT DISTINCT substr(d,1,7) m FROM (SELECT data_saida d FROM saidas UNION SELECT data FROM atendimentos UNION SELECT data FROM avaliacoes) ORDER BY 1'), 'm'),
-        'contagens' => $cont,
+        'contagens' => $cont + ['profissionais_ativos' => (int) one('SELECT COUNT(*) FROM profissionais WHERE ativo = 1')],
         'ativos' => (int) one("SELECT COUNT(*) FROM pacientes WHERE status='ativo'"),
         'agenda' => rows('SELECT v.unidade, v.data_ref, (SELECT COUNT(*) FROM agenda_pacientes ap JOIN agenda_slots s ON s.id=ap.slot_id WHERE s.versao_id=v.id) n
                           FROM agenda_versoes v WHERE v.data_ref = (SELECT MAX(data_ref) FROM agenda_versoes x WHERE x.unidade=v.unidade) ORDER BY v.unidade'),
