@@ -693,3 +693,119 @@ function agenda_profissional(int $pid): array
     unset($s);
     return $slots;
 }
+
+// ------------------------------------------------------------------ acompanhamento por sala
+/**
+ * Nome da sala a partir do cabeçalho da coluna. Junta as grafias da planilha
+ * ("Terapia Ocupacional IS", "IS - TERAPIA OCUPACIONAL", "Ofcina de AVD"...) e descarta faixa etária e aplicadores.
+ * Cabeçalhos que só dizem a função ("PSICÓLOGA", "(FONO)") viram o nome da área.
+ */
+function agenda_sala_nome(?string $sala, string $area): string
+{
+    $segs = array_values(array_filter(array_map('trim', explode(' · ', (string) $sala)), fn($x) => $x !== ''));
+    $ns = array_map('norm', $segs);
+    if (array_filter($ns, fn($x) => preg_match('/^\(A\.?\s*T\.?\)$/', $x)) || $area === 'Acompanhamento Terapêutico') {
+        return 'Acompanhamento Terapêutico (A.T.)';
+    }
+    $s = $segs[0] ?? '';
+    if (isset($segs[1]) && preg_match('/-\s*$/u', $s)) {                    // "Oficina ABA - · Sala de Jogos"
+        $s .= ' ' . $segs[1];
+    }
+    $s = (string) preg_replace(['/\bOfcina\b/iu', '/Ocupacinal/iu', '/\s+-\s*|\s*-\s+/u', '/\s+/u'], ['Oficina', 'Ocupacional', ' - ', ' '], $s);
+    $s = trim($s, " -");
+    $n = norm($s);
+    if ($n === '' || str_starts_with($n, '(') || preg_match('/^(PSICOLOG[OA]S?|PSICOTERAPIA)$/', $n)) {
+        return $area;
+    }
+    if (preg_match('/TERAPIA OCUPACIONAL/', $n) && (preg_match('/\bIS\b/', $n) || in_array('(IS)', $ns, true))) {
+        return 'Terapia Ocupacional - IS';
+    }
+    if (preg_match('/^PSICOPEDAGOGIA (\d)/', $n, $m)) {                       // "Psicopedagogia 2 - Ambiente Compartilhado"
+        return 'Psicopedagogia ' . $m[1] . (str_contains($n, 'AMBIENTE') ? ' - Ambiente Compartilhado' : '');
+    }
+    // capitaliza mantendo os acentos ("OFICINA DE MUSICALIZAÇÃO" -> "Oficina de Musicalização")
+    $out = [];
+    foreach (explode(' ', mb_strtolower($s, 'UTF-8')) as $i => $w) {
+        $out[] = in_array($w, ['de', 'da', 'do', 'dos', 'das', 'e'], true) && $i ? $w
+            : (in_array(mb_strtoupper($w, 'UTF-8'), ['ABA', 'IS', 'AVD', '6D'], true) ? mb_strtoupper($w, 'UTF-8') : mb_convert_case($w, MB_CASE_TITLE, 'UTF-8'));
+    }
+    return implode(' ', $out);
+}
+
+function agenda_versoes_in(?string $unidade): ?string
+{
+    $ids = array_map(fn($v) => (int) $v['atual']['id'], agenda_versoes_atuais($unidade));
+    return $ids ? implode(',', $ids) : null;
+}
+
+/** Salas e áreas da agenda atual, com atendimentos e terapeutas, para escolher no painel. */
+function agenda_salas(array $q): array
+{
+    $unidade = isset($q['unidade']) && $q['unidade'] !== '' ? unidade_norm((string) $q['unidade']) : null;
+    $in = agenda_versoes_in($unidade);
+    if (!$in) {
+        return ['salas' => [], 'areas' => []];
+    }
+    $rows = rows("SELECT s.sala, s.profissional_id, e.id esp_id, e.nome esp, v.unidade,
+                         (SELECT COUNT(*) FROM agenda_pacientes ap WHERE ap.slot_id=s.id AND ap.congelado=0) n
+                  FROM agenda_slots s JOIN agenda_versoes v ON v.id=s.versao_id JOIN profissionais p ON p.id=s.profissional_id
+                  JOIN especialidades e ON e.id=p.especialidade_id WHERE s.versao_id IN ($in)");
+    $salas = $areas = [];
+    foreach ($rows as $r) {
+        $nome = agenda_sala_nome($r['sala'], $r['esp']);
+        foreach ([[&$salas, $nome, $nome], [&$areas, (string) $r['esp_id'], $r['esp']]] as [&$alvo, $k, $rot]) {
+            $alvo[$k] ??= ['valor' => $k, 'nome' => $rot, 'atendimentos' => 0, 'profs' => [], 'unidades' => []];
+            $alvo[$k]['atendimentos'] += (int) $r['n'];
+            $alvo[$k]['profs'][$r['profissional_id']] = true;
+            $alvo[$k]['unidades'][$r['unidade']] = true;
+        }
+        unset($alvo);
+    }
+    $fim = function (array $l): array {
+        $l = array_map(fn($x) => ['valor' => $x['valor'], 'nome' => $x['nome'], 'atendimentos' => $x['atendimentos'],
+                                  'terapeutas' => count($x['profs']), 'unidades' => array_keys($x['unidades'])], array_values($l));
+        usort($l, fn($a, $b) => $b['atendimentos'] <=> $a['atendimentos']);
+        return $l;
+    };
+    return ['salas' => $fim($salas), 'areas' => $fim($areas)];
+}
+
+/** Horários de uma sala (modo=sala) ou área (modo=area): pacientes, terapeutas e horários. */
+function agenda_sala(array $q): array
+{
+    $unidade = isset($q['unidade']) && $q['unidade'] !== '' ? unidade_norm((string) $q['unidade']) : null;
+    $modo = ($q['modo'] ?? 'area') === 'sala' ? 'sala' : 'area';
+    $valor = (string) ($q['valor'] ?? '');
+    $in = agenda_versoes_in($unidade);
+    if (!$in || $valor === '') {
+        return [];
+    }
+    $filtro = $modo === 'area' ? ' AND p.especialidade_id = ' . (int) $valor : '';
+    $slots = rows("SELECT s.id, s.dia, s.periodo, s.hora, s.sala, s.aplicadores, s.situacao, s.modalidade, s.vagas_grupo, v.unidade,
+                          p.id prof_id, p.nome prof, p.foto_url foto, e.id esp_id, e.nome esp
+                   FROM agenda_slots s JOIN agenda_versoes v ON v.id=s.versao_id JOIN profissionais p ON p.id=s.profissional_id
+                   JOIN especialidades e ON e.id=p.especialidade_id
+                   WHERE s.versao_id IN ($in) $filtro ORDER BY s.dia, s.hora, p.nome");
+    foreach ($slots as $i => &$s) {
+        $s['sala_nome'] = agenda_sala_nome($s['sala'], $s['esp']);
+        if ($modo === 'sala' && $s['sala_nome'] !== $valor) {
+            unset($slots[$i]);
+        }
+    }
+    unset($s);
+    $slots = array_values($slots);
+    if (!$slots) {
+        return [];
+    }
+    $pacs = [];
+    $ids = implode(',', array_map(fn($s) => (int) $s['id'], $slots));
+    foreach (rows("SELECT ap.slot_id, pa.id paciente_id, pa.nome, ap.novo, ap.retorno, ap.saida, ap.ajuste, ap.sem_aut, ap.congelado, ap.data_marca
+                   FROM agenda_pacientes ap JOIN pacientes pa ON pa.id=ap.paciente_id WHERE ap.slot_id IN ($ids)") as $p) {
+        $pacs[$p['slot_id']][] = $p;
+    }
+    foreach ($slots as &$s) {
+        $s['pacientes'] = $pacs[$s['id']] ?? [];
+    }
+    unset($s);
+    return $slots;
+}

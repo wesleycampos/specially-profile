@@ -275,6 +275,7 @@ function agQs(){
   return p.toString();
 }
 function mergeAgenda(){
+  SALAS = null; SALA_KEY = null;   // recarrega o quadro por sala depois de importar ou trocar a unidade
   const byId = {}; (AG?.profissionais || []).forEach(x => byId[x.id] = x);
   D.profissionais.forEach(p => { const x = byId[p.id]; p.ag_atend = x ? x.atendimentos : null; p.ag_novos = x ? x.novos : null; p.ag = x || null; });
 }
@@ -355,8 +356,90 @@ function rAgenda(){
     AG.areas.map(a => `<tr class="click" data-e="${a.id}"><td><span class="tag"><span class="sw" style="background:${espColor(a.id)}"></span>${esc(a.nome)}</span></td><td class="num">${a.profissionais}</td><td class="num">${a.atendimentos}</td><td class="num">${fmt(a.por_prof)}</td><td class="num">${pctf(a.ocupacao)}</td><td class="num">${a.novos}</td><td class="num">${a.perdas}</td></tr>`).join('') + '</tbody>';
   $('agAreas').querySelectorAll('tr[data-e]').forEach(tr => tr.onclick = () => { $('fEsp').value = tr.dataset.e; refresh(); });
 
-  rAgLista(); rAgTabela();
+  rAgLista(); rAgTabela(); rSala();
   ['agPodBest','agBest','agPodWorst','agWorst'].forEach(id => bindProfClicks($(id)));
+}
+/* --- acompanhamento por sala / área --- */
+let salaModo = 'area', salaValor = {area:null, sala:null}, SALAS = null, SALAS_UNI = null, SALA = null, SALA_KEY = null;
+const diaCurto = d => DIAS[d].slice(0, 3);
+async function rSala(){
+  const uni = $('agUni').value;
+  if (!SALAS || SALAS_UNI !== uni) { SALAS = await api('api/agenda/salas?' + new URLSearchParams(uni ? {unidade:uni} : {})); SALAS_UNI = uni; }
+  $('agSalaModo').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === salaModo));
+  const ops = salaModo === 'area' ? SALAS.areas : SALAS.salas;
+  if (!ops.some(o => o.valor === salaValor[salaModo]))
+    salaValor[salaModo] = (ops.find(o => /fonoaudiologia/i.test(o.nome)) || ops[0])?.valor ?? null;
+  $('agSalaSel').innerHTML = ops.map(o => `<option value="${esc(o.valor)}" ${o.valor === salaValor[salaModo] ? 'selected' : ''}>${esc(o.nome)} — ${o.atendimentos} atend. · ${o.terapeutas} terapeuta(s)${uni ? '' : ' · ' + esc(o.unidades.join('/'))}</option>`).join('');
+  if (!salaValor[salaModo]) return;
+  const key = [uni, salaModo, salaValor[salaModo]].join('|');
+  if (SALA_KEY !== key) {
+    SALA = await api('api/agenda/sala?' + new URLSearchParams({modo:salaModo, valor:salaValor[salaModo], ...(uni ? {unidade:uni} : {})}));
+    SALA_KEY = key;
+    const profs = [...new Map(SALA.map(s => [s.prof_id, s.prof])).entries()].sort((a,b) => a[1].localeCompare(b[1]));
+    const cur = $('agSalaProf').value;
+    $('agSalaProf').innerHTML = '<option value="">Todos os terapeutas</option>' + profs.map(([id, n]) => `<option value="${id}">${esc(n)}</option>`).join('');
+    $('agSalaProf').value = profs.some(([id]) => String(id) === cur) ? cur : '';
+  }
+  rSalaConteudo();
+}
+function rSalaConteudo(){
+  const uni = $('agUni').value, pf = $('agSalaProf').value, q = norm($('agSalaBusca').value);
+  const flags = p => Object.keys(agBadge).filter(k => +p[k]);
+  // terapeutas (sempre da sala inteira)
+  const ter = {};
+  SALA.forEach(s => {
+    const t = ter[s.prof_id] ??= {id:s.prof_id, nome:s.prof, esp:s.esp, esp_id:s.esp_id, foto_url:s.foto, atend:0, pacs:new Set(), hor:0, vagos:0, novos:new Set(), saida:new Set(), unis:new Set()};
+    t.unis.add(s.unidade);
+    if (s.situacao === 'ocupado') t.hor++; else if (s.situacao === 'vago') t.vagos++;
+    s.pacientes.forEach(p => { if (!+p.congelado) t.atend++; t.pacs.add(p.paciente_id); if (+p.novo) t.novos.add(p.paciente_id); if (+p.saida) t.saida.add(p.paciente_id); });
+  });
+  const ters = Object.values(ter).sort((a,b) => b.atend - a.atend);
+  $('agSalaTer').innerHTML = `<thead><tr><th>Terapeuta</th><th class="num">Atend./sem</th><th class="num">Pacientes</th><th class="num">Horários</th><th class="num">Vagos</th><th class="num">Novos</th><th class="num">De saída</th><th></th></tr></thead><tbody>` +
+    ters.map(t => `<tr class="click ${String(t.id) === pf ? 'sel' : ''}" data-t="${t.id}"><td>${who({...t, esp: t.esp + (uni ? '' : ' · ' + [...t.unis].join('/'))})}</td><td class="num"><b>${t.atend}</b></td><td class="num">${t.pacs.size}</td><td class="num">${t.hor}</td><td class="num">${t.vagos || '—'}</td><td class="num">${t.novos.size || '—'}</td><td class="num">${t.saida.size || '—'}</td><td><a href="#" data-p="${t.id}" title="Abrir ficha">ficha</a></td></tr>`).join('') + '</tbody>';
+  $('agSalaTer').querySelectorAll('tr[data-t]').forEach(tr => tr.onclick = e => { if (e.target.closest('[data-p]')) return; $('agSalaProf').value = $('agSalaProf').value === tr.dataset.t ? '' : tr.dataset.t; rSalaConteudo(); });
+  bindProfClicks($('agSalaTer'));
+
+  // recorte: terapeuta escolhido e busca de paciente
+  const slots = SALA.filter(s => !pf || String(s.prof_id) === pf)
+    .map(s => ({...s, pacientes: s.pacientes.filter(p => !q || norm(p.nome).includes(q))}))
+    .filter(s => !q || s.pacientes.length);
+  const pacs = {};
+  let atend = 0, hor = 0, vagos = 0;
+  slots.forEach(s => {
+    if (s.situacao === 'ocupado') hor++; else if (s.situacao === 'vago') vagos++;
+    s.pacientes.forEach(p => {
+      if (!+p.congelado) atend++;
+      const x = pacs[p.paciente_id] ??= {nome:p.nome, horarios:[], ters:new Set(), flags:new Set()};
+      x.horarios.push(`${diaCurto(s.dia)} ${s.hora}`); x.ters.add(s.prof); flags(p).forEach(f => x.flags.add(f));
+    });
+  });
+  const pl = Object.values(pacs).sort((a,b) => a.nome.localeCompare(b.nome));
+  const nNovos = pl.filter(p => p.flags.has('novo')).length, nSaida = pl.filter(p => p.flags.has('saida')).length;
+  $('agSalaKpis').innerHTML =
+    kpi('cal', 'Atendimentos por semana', fmt(atend), `${fmt(hor)} horários ocupados`) +
+    kpi('users', 'Pacientes', fmt(pl.length), `${nNovos} novos · ${nSaida} de saída`) +
+    kpi('users', 'Terapeutas', fmt(pf ? 1 : ters.length), pf ? esc(ter[pf]?.nome || '') : 'atendendo nesta ' + (salaModo === 'area' ? 'área' : 'sala')) +
+    kpi('pct', 'Ocupação', pctf(hor + vagos ? 100 * hor / (hor + vagos) : null), `${fmt(vagos)} horários vagos`);
+  $('agSalaPac').innerHTML = pl.length ? `<thead><tr><th>Paciente</th><th>Horários</th><th>Terapeuta(s)</th></tr></thead><tbody>` +
+    pl.map(p => `<tr><td><b>${esc(p.nome)}</b> ${[...p.flags].map(agTag).join(' ')}</td><td style="font-size:12px">${p.horarios.map(esc).join(', ')}</td><td style="font-size:12px">${[...p.ters].map(esc).join(', ')}</td></tr>`).join('') + '</tbody>'
+    : '<tr><td class="empty">Nenhum paciente</td></tr>';
+
+  // grade semanal: hora × dia, cada horário com o terapeuta e os pacientes
+  const dias = [1,2,3,4,5,6].filter(d => slots.some(s => s.dia === d));
+  const horas = [...new Set(slots.map(s => s.hora))].sort();
+  const cel = (d, h) => {
+    const ss = slots.filter(s => s.dia === d && s.hora === h);
+    const ocup = ss.filter(s => s.pacientes.length).map(s => `<div class="agc ${s.modalidade === 'grupo' ? 'grp' : ''}" title="${esc(s.sala_nome)}${s.aplicadores ? ' · ' + esc(s.aplicadores) : ''}">
+      <div class="agt">${esc(s.prof)}${uni ? '' : ` <span>${esc(s.unidade)}</span>`}${s.modalidade === 'grupo' ? ' <span>· grupo</span>' : ''}</div>
+      ${s.pacientes.map(p => `<div>${esc(p.nome)} ${flags(p).map(agTag).join(' ')}</div>`).join('')}</div>`).join('');
+    const livres = q ? [] : ss.filter(s => !s.pacientes.length);
+    const vag = livres.filter(s => s.situacao === 'vago'), fec = livres.filter(s => s.situacao === 'fechado');
+    return ocup + (vag.length ? `<div class="agc vago" title="${esc(vag.map(s => s.prof).join(', '))}">vago: ${esc(vag.map(s => s.prof.split(' ')[0]).join(', '))}</div>` : '')
+      + (fec.length ? `<div class="agc fech" title="${esc(fec.map(s => s.prof).join(', '))}">fechado: ${esc(fec.map(s => s.prof.split(' ')[0]).join(', '))}</div>` : '');
+  };
+  $('agSalaGrade').innerHTML = horas.length ? `<thead><tr><th>Hora</th>${dias.map(d => `<th>${DIAS[d]}</th>`).join('')}</tr></thead><tbody>` +
+    horas.map(h => `<tr><td class="num"><b>${h}</b></td>${dias.map(d => `<td>${cel(d, h)}</td>`).join('')}</tr>`).join('') + '</tbody>'
+    : '<tr><td class="empty">Nenhum horário</td></tr>';
 }
 function rAgLista(){
   const nome = id => AG.profissionais.find(p => p.id === id)?.nome || '—';
@@ -868,7 +951,10 @@ $('fClear').onclick = () => { let tmr; const deb = fn => () => { clearTimeout(tm
 ['fDe','fAte','fEsp','fConv','fMod'].forEach(id => $(id).value = ''); refresh(); };
 $('rkEsp').onchange = rRanking;
 $('agUni').onchange = async () => { AG = await api('api/agenda?' + agQs()); mergeAgenda(); renderSection(); };
-$('agAT').onchange = rAgenda; $('agBusca').oninput = deb(rAgTabela); $('agLsBusca').oninput = deb(rAgLista); $('agCsv').onclick = csvAgenda;
+$('agAT').onchange = rAgenda;
+$('agSalaModo').querySelectorAll('button').forEach(b => b.onclick = () => { salaModo = b.dataset.m; rSala(); });
+$('agSalaSel').onchange = () => { salaValor[salaModo] = $('agSalaSel').value; $('agSalaProf').value = ''; rSala(); };
+$('agSalaProf').onchange = rSalaConteudo; $('agSalaBusca').oninput = deb(rSalaConteudo); $('agBusca').oninput = deb(rAgTabela); $('agLsBusca').oninput = deb(rAgLista); $('agCsv').onclick = csvAgenda;
 $('indBusca').oninput = deb(rIndividual);
 $('pcBusca').oninput = deb(rEquipe); $('pcSort').onchange = rEquipe; $('pcMov').onchange = rEquipe;
 $('plBusca').oninput = deb(rPerdas);

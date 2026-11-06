@@ -53,6 +53,12 @@ try {
         if ($r === 'agenda') {
             send(200, agenda_painel($_GET));
         }
+        if ($r === 'agenda/salas') {
+            send(200, agenda_salas($_GET));
+        }
+        if ($r === 'agenda/sala') {
+            send(200, agenda_sala($_GET));
+        }
         if (preg_match('#^agenda/prof/(\d+)$#', $r, $m)) {
             send(200, agenda_profissional((int) $m[1]));
         }

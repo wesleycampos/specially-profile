@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Specially Profile</title>
 <meta name="robots" content="noindex,nofollow">
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=11">
 <script src="vendor/chart.umd.min.js"></script>
 </head>
 <body>
@@ -97,6 +97,24 @@
     <div id="agVazio"></div>
     <div id="agConteudo" style="display:grid;gap:16px">
     <div class="kpis" id="agKpis"></div>
+    <div class="card" id="agSalaCard">
+      <div class="card-head">
+        <div><h2>Acompanhamento por sala / área</h2><div class="hint">Escolha uma área (ex.: Fonoaudiologia) ou uma sala para ver os atendimentos, os pacientes, os horários e os terapeutas</div></div>
+        <div class="filters">
+          <div class="seg" id="agSalaModo"><button data-m="area">Por área</button><button data-m="sala">Por sala</button></div>
+          <select id="agSalaSel" style="min-width:240px"></select>
+          <select id="agSalaProf"><option value="">Todos os terapeutas</option></select>
+          <input type="search" id="agSalaBusca" placeholder="Buscar paciente…" style="width:170px">
+        </div>
+      </div>
+      <div class="kpis" id="agSalaKpis" style="margin:6px 0 14px"></div>
+      <div class="grid g2">
+        <div><h3 class="agsub">Terapeutas</h3><div class="hint" style="margin:0 0 6px;color:var(--muted);font-size:12px">Clique para ver só os horários de um terapeuta</div><div class="tablewrap" style="max-height:340px"><table id="agSalaTer"></table></div></div>
+        <div><h3 class="agsub">Pacientes</h3><div class="hint" style="margin:0 0 6px;color:var(--muted);font-size:12px">Horários da semana e com quem o paciente é atendido</div><div class="tablewrap" style="max-height:340px"><table id="agSalaPac"></table></div></div>
+      </div>
+      <h3 class="agsub" style="margin-top:16px">Grade da semana</h3>
+      <div class="tablewrap" style="max-height:640px"><table class="aggrid" id="agSalaGrade"></table></div>
+    </div>
     <div class="card">
       <div class="card-head"><div><h2>Rankings da agenda</h2><div class="hint" id="agRkHint"></div></div>
         <label style="font-size:12px;color:var(--text-2)" title="Acompanhantes terapêuticos têm poucos horários por natureza e dominariam a lista de quem menos atende"><input type="checkbox" id="agAT"> incluir acompanhantes terapêuticos (A.T.)</label></div>
@@ -251,6 +269,6 @@
 </div>
 
 <dialog id="dlg"></dialog>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

@@ -240,3 +240,7 @@ details.ploss .inner{padding:4px 8px 12px 52px}
 .agc.vago{color:var(--muted);background:transparent;border:1px dashed var(--border);text-align:center}
 .agc.fech{color:var(--muted);background:transparent;text-align:center;font-style:italic}
 .agg{font-size:10.5px;color:var(--text-2);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.agsub{margin:0 0 4px;font-size:13px;font-weight:650}
+.agt{font-weight:650;font-size:11.5px;color:var(--brand-2);margin-bottom:2px}
+.agt span{font-weight:500;color:var(--muted)}
+tr.sel td{background:var(--brand-soft)}
