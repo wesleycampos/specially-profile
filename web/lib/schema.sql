@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS atendimentos (
   profissional_id  INTEGER NOT NULL REFERENCES profissionais(id) ON DELETE CASCADE,
   status           TEXT NOT NULL CHECK (status IN ('realizado','falta','falta_justificada','cancelado_clinica','cancelado_paciente')),
   valor            REAL,
+  origem           TEXT,          -- hipo | manual | NULL (planilha)
   UNIQUE (data, paciente_id, profissional_id)
 );
 
@@ -197,3 +198,26 @@ CREATE TABLE IF NOT EXISTS hipo_grade (
   motivo         TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_hipo_grade_prof ON hipo_grade(hipo_prof);
+
+-- Histórico da agenda diária do Hipo (todas as sessões, inclusive agendadas e desmarcadas). Base dos atendimentos de origem "hipo".
+CREATE TABLE IF NOT EXISTS hipo_sessoes (
+  id             INTEGER PRIMARY KEY,   -- id da sessão no Hipo
+  data           TEXT NOT NULL,
+  hora_inicio    TEXT,
+  hora_fim       TEXT,
+  hipo_prof      INTEGER NOT NULL,      -- profissionais.hipo_id
+  hipo_paciente  INTEGER,
+  paciente       TEXT,
+  especialidade  TEXT,
+  convenio       TEXT,
+  sala           TEXT,
+  status         TEXT,                  -- Atendida, Faltou, Falta Justificáveis, Desmarcada…, Aguardando, Congelado…
+  avaliacao      TEXT,                  -- "Avaliada" = evolução registrada; senão o motivo/observação
+  unidade        TEXT,                  -- Matriz | Vila
+  procedimento   TEXT,
+  codigo         TEXT,
+  tipo_guia      TEXT,
+  obs            TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_hipo_sessoes_prof ON hipo_sessoes(hipo_prof, data);
+CREATE INDEX IF NOT EXISTS ix_hipo_sessoes_data ON hipo_sessoes(data);

@@ -55,6 +55,7 @@ function migrar(PDO $pdo): void
         'profissionais' => [['modalidade', "TEXT NOT NULL DEFAULT 'individual'"], ['hipo_id', 'INTEGER'], ['nome_completo', 'TEXT'],
                             ['unidade', 'TEXT'], ['contratacao', 'TEXT'], ['capacidade_semanal', 'INTEGER']],
         'vinculos' => [['modalidade', 'TEXT'], ['grupo_id', 'INTEGER']],
+        'atendimentos' => [['origem', 'TEXT']],
         'saida_profissionais' => [['modalidade', 'TEXT'], ['grupo_id', 'INTEGER']],
     ];
     foreach ($novas as $tabela => $cols) {

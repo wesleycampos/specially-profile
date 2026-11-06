@@ -77,6 +77,20 @@ O Hipo Saúde (https://specially.hiposaudeintegrada.com.br) vai ser descontinuad
 - **Conciliação:** aba **Cadastros → Conciliação Hipo** lista os ativos que ficaram sem par, com sugestões. Para cada um: **Unir** (é a mesma pessoa), **Marcar inativo** (já saiu) ou manter (é nova).
 - **Especialidades do Hipo → áreas do Profile:** `HIPO_ESP` em `web/lib/hipo.php`. Aplicador ABA vira Acompanhamento Terapêutico, Coordenador ABA vira Psicologia, Jiu-Jitsu vira Psicomotricidade e Pedagogia vira Psicopedagogia.
 
+### Agenda diária e atendimentos (histórico de 2026)
+- `dados/hipo/hipo-sessoes-AAAA-MM.json`: um arquivo por mês, de jan a nov/2026, com cerca de 190 mil sessões das duas unidades. Contém data, horário, terapeuta, paciente, convênio, status e se a evolução foi registrada. Não contém telefones nem responsáveis.
+- **Importar:** aba **Importar** → *Agenda diária do Hipo*, um arquivo por vez. Reimportar um mês substitui só aquele mês.
+- **Onde fica:** o histórico completo vai para `hipo_sessoes`. As sessões com desfecho viram **atendimentos** (origem `hipo`), que liberam faltas, produtividade e sessões por mês.
+  - Atendida → realizado.
+  - Faltou ou falta injustificável → falta.
+  - Falta justificável → falta justificada.
+  - Desmarcada ou cancelada pela clínica → cancelado pela clínica.
+  - Desmarcada pelo paciente → cancelado pelo paciente.
+  - Aguardando, Congelado, Feriado e similares ficam só no histórico.
+- **Pacientes:** quem não existia no Profile é criado como **inativo**.
+- **Ficha do profissional:** cartão *Agenda no Hipo*, com navegação por semana, status de cada sessão, evolução registrada ou pendente e resumo mês a mês.
+- O painel soma os atendimentos no banco, sem carregar linha a linha, por causa do volume.
+
 ### Lotação (aba Lotação)
 - **Capacidade de cada terapeuta ativo** (horários por semana). Vale a primeira regra que se aplicar:
   1. O valor informado à mão (campo *Capacidade semanal*).

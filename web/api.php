@@ -64,6 +64,9 @@ try {
         if (preg_match('#^agenda/prof/(\d+)$#', $r, $m)) {
             send(200, agenda_profissional((int) $m[1]));
         }
+        if (preg_match('#^hipo/agenda/(\d+)$#', $r, $m)) {
+            send(200, hipo_agenda_prof((int) $m[1], $_GET['semana'] ?? null));
+        }
         if ($r === 'lotacao') {
             send(200, lotacao($_GET));
         }

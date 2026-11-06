@@ -63,13 +63,19 @@ function dashboard(array $q): array
     }
 
     // --- atendimentos e avaliações
+    // Somado no banco por profissional, paciente, mês e status (o histórico do Hipo tem centenas de milhares de sessões;
+    // carregar linha a linha estoura a memória do PHP). Cada item traz n = quantidade e valor = total do grupo.
     $atend = [];
-    foreach (rows('SELECT * FROM atendimentos WHERE data BETWEEN ? AND ?', [$d0, $d1]) as $a) {
+    foreach (rows("SELECT profissional_id, paciente_id, substr(data, 1, 7) mes, status, COUNT(*) n,
+                          COALESCE(SUM(valor), 0) soma, SUM(valor IS NULL) sem_valor
+                   FROM atendimentos WHERE data BETWEEN ? AND ? GROUP BY 1, 2, 3, 4", [$d0, $d1]) as $a) {
         if (!$profOk($a['profissional_id']) || !$convOk($pacs[$a['paciente_id']]['convenio_id'])) {
             continue;
         }
-        if ($a['valor'] === null && $a['status'] === 'realizado') {
-            $a['valor'] = $convs[$pacs[$a['paciente_id']]['convenio_id']]['valor_sessao'] ?? null;
+        $a['n'] = (int) $a['n'];
+        $a['valor'] = (float) $a['soma'];
+        if ($a['status'] === 'realizado' && $a['sem_valor']) {   // sem valor no atendimento: valor da sessão do convênio
+            $a['valor'] += (int) $a['sem_valor'] * (float) ($convs[$pacs[$a['paciente_id']]['convenio_id']]['valor_sessao'] ?? 0);
         }
         $atend[] = $a;
     }
@@ -118,10 +124,10 @@ function dashboard(array $q): array
     foreach ($atend as $a) {
         $m = &$P[$pm($a['profissional_id'])];
         if ($a['status'] === 'realizado') {
-            $m['sessoes']++;
-            $m['faturamento'] += (float) ($a['valor'] ?? 0);
+            $m['sessoes'] += $a['n'];
+            $m['faturamento'] += $a['valor'];
         } elseif (in_array($a['status'], ['falta', 'falta_justificada'], true)) {
-            $m['faltas']++;
+            $m['faltas'] += $a['n'];
         }
         unset($m);
     }
@@ -284,12 +290,12 @@ function dashboard(array $q): array
         $meses[$k]['saidas'][$s['motivo_categoria']] = ($meses[$k]['saidas'][$s['motivo_categoria']] ?? 0) + 1;
     }
     foreach ($atend as $a) {
-        $k = $mes(substr($a['data'], 0, 7));
+        $k = $mes($a['mes']);
         if ($a['status'] === 'realizado') {
-            $meses[$k]['sessoes']++;
-            $meses[$k]['faturamento'] += (float) ($a['valor'] ?? 0);
+            $meses[$k]['sessoes'] += $a['n'];
+            $meses[$k]['faturamento'] += $a['valor'];
         } elseif (in_array($a['status'], ['falta', 'falta_justificada'], true)) {
-            $meses[$k]['faltas']++;
+            $meses[$k]['faltas'] += $a['n'];
         }
     }
     ksort($meses);
@@ -316,9 +322,9 @@ function dashboard(array $q): array
     foreach ($atend as $a) {
         $faltPac[$a['paciente_id']] ??= [0, 0];
         if ($a['status'] === 'realizado') {
-            $faltPac[$a['paciente_id']][0]++;
+            $faltPac[$a['paciente_id']][0] += $a['n'];
         } elseif (in_array($a['status'], ['falta', 'falta_justificada'], true)) {
-            $faltPac[$a['paciente_id']][1]++;
+            $faltPac[$a['paciente_id']][1] += $a['n'];
         }
     }
     uasort($faltPac, fn($a, $b) => [$b[1], $a[0]] <=> [$a[1], $b[0]]);

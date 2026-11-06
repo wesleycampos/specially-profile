@@ -814,9 +814,11 @@ async function openProf(id){
         <div class="card"><h2>Avaliações (${f.avaliacoes.length})</h2>${f.avaliacoes.length ? f.avaliacoes.slice(0,15).map(a => `<div style="padding:6px 0;border-bottom:1px solid var(--grid)"><b>${a.nota}</b>/10 <span style="color:var(--muted)">${dataL(a.data)} · ${esc(a.paciente||'')}</span><div>${esc(a.comentario||'')}</div></div>`).join('') : '<div class="empty">Sem avaliações</div>'}</div>
       </div>
       ${agSlots.length ? `<div class="card"><h2>Agenda semanal</h2><div class="hint">${ag ? `${ag.atendimentos} atendimentos/semana · ${ag.pacientes} pacientes · ${ag.novos} novos · ${ag.perdas} de saída · ocupação ${pctf(ag.ocupacao)}` : 'Agenda mais recente de cada unidade'}</div>${agendaGrid(agSlots)}</div>` : ''}
+      <div class="card" id="hipoAg"></div>
       ${f.atend_mes.length ? `<div class="card"><h2>Sessões e faltas por mês</h2><div class="chartbox" style="height:220px"><canvas id="cProfAt"></canvas></div></div>` : ''}
     </div>`;
   dlg.showModal();
+  hipoAgenda(id);
   $('mClose').onclick = () => dlg.close();
   $('mEdit').onclick = () => editProf(f);
   $('mInd').onclick = () => { indProf = id; indEsp = ''; dlg.close(); location.hash = 'individual'; go(); };
@@ -830,6 +832,35 @@ async function openProf(id){
     draw('cProfAt', {type:'bar', data:{labels:f.atend_mes.map(m => mesL(m.mes)), datasets:[bar(f.atend_mes.map(m => m.sessoes), css('--s1'), 'Realizadas'), {...bar(f.atend_mes.map(m => m.faltas), css('--s2'), 'Faltas'), borderSkipped:false}]}, options:o});
   }
 }
+/* Agenda do Hipo na ficha: semana a semana, com status e evolução de cada sessão */
+const HIPO_ST = s => { const n = norm(s);
+  return n === 'ATENDIDA' ? 'good' : /^FALT/.test(n) ? 'bad' : /^(DESMARCADA|CANCELAD)/.test(n) ? 'warn' : ''; };
+const diaSem = d => ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][new Date(d + 'T12:00').getDay()];
+async function hipoAgenda(id, semana){
+  const box = $('hipoAg'); if (!box) return;
+  const r = await api(`api/hipo/agenda/${id}` + (semana ? '?semana=' + semana : ''));
+  if (!$('hipoAg')) return;
+  if (!r.tem) { box.remove(); return; }
+  const dc = d => d.split('-').reverse().join('/');
+  const fim = new Date(r.semana + 'T12:00'); fim.setDate(fim.getDate() + 5);
+  const dias = {}; r.sessoes.forEach(x => (dias[x.data] ??= []).push(x));
+  const tot = r.sessoes.length, at = r.sessoes.filter(x => x.status === 'Atendida').length,
+        fal = r.sessoes.filter(x => HIPO_ST(x.status) === 'bad').length, sem = r.sessoes.filter(x => x.status === 'Atendida' && x.avaliacao !== 'Avaliada').length,
+        pac = new Set(r.sessoes.map(x => x.paciente)).size;
+  box.innerHTML = `<div class="card-head"><div><h2>Agenda no Hipo</h2><div class="hint" style="margin:0">Semana de ${dc(r.semana)} a ${dc(fim.toISOString().slice(0, 10))} · ${tot} sessões · ${pac} pacientes · ${at} atendidas · ${fal} faltas${sem ? ` · <b class="st-warn">${sem} sem evolução registrada</b>` : ''}</div></div>
+      <div class="filters"><button id="hAnt">‹ Semana anterior</button><input type="date" id="hSem" value="${r.semana}"><button id="hProx">Próxima ›</button></div></div>
+    ${tot ? `<div class="tablewrap" style="max-height:420px"><table><thead><tr><th>Dia</th><th>Horário</th><th>Paciente</th><th>Convênio</th><th>Status</th><th>Evolução</th><th>Unidade</th></tr></thead><tbody>${
+      Object.entries(dias).map(([d, l]) => l.map((x, i) => `<tr>${i ? '<td></td>' : `<td style="white-space:nowrap"><b>${diaSem(d)}</b> ${dc(d).slice(0, 5)}</td>`}<td>${esc(x.hora_inicio || '')}${x.hora_fim ? '–' + esc(x.hora_fim) : ''}</td><td>${esc(x.paciente || '—')}</td><td>${esc(x.convenio || '—')}</td>
+        <td><span class="st-${HIPO_ST(x.status)}">${esc(x.status || '—')}</span></td><td>${x.avaliacao === 'Avaliada' ? '✓' : x.status === 'Atendida' ? '<span class="st-warn">pendente</span>' : `<span style="color:var(--muted)">${esc(x.avaliacao || '')}</span>`}</td><td>${esc(x.unidade || '')}</td></tr>`).join('')).join('')}</tbody></table></div>`
+      : '<div class="empty">Nenhuma sessão nesta semana.</div>'}
+    <h3 style="margin:16px 0 6px;font-size:14px">Mês a mês no Hipo</h3>
+    <div class="tablewrap" style="max-height:300px"><table><thead><tr><th>Mês</th><th class="num">Sessões</th><th class="num">Atendidas</th><th class="num">Faltas</th><th class="num">% faltas</th><th class="num">Desmarcadas</th><th class="num">Pacientes</th><th class="num">Sem evolução</th></tr></thead><tbody>${
+      r.meses.map(m => `<tr><td>${mesL(m.mes)}</td><td class="num">${fmt(m.total)}</td><td class="num">${fmt(m.atendidas)}</td><td class="num">${fmt(m.faltas)}</td><td class="num">${pctf(m.atendidas + m.faltas ? Math.round(1000 * m.faltas / (m.atendidas + m.faltas)) / 10 : null)}</td><td class="num">${fmt(m.desmarcadas)}</td><td class="num">${fmt(m.pacientes)}</td><td class="num">${m.sem_evolucao ? `<span class="st-warn">${fmt(m.sem_evolucao)}</span>` : '0'}</td></tr>`).join('')}</tbody></table></div>`;
+  $('hAnt').onclick = () => hipoAgenda(id, r.anterior);
+  $('hProx').onclick = () => hipoAgenda(id, r.proxima);
+  $('hSem').onchange = () => $('hSem').value && hipoAgenda(id, $('hSem').value);
+}
+
 function editProf(f){
   const dlg = $('dlg'); const isNew = !f.id;
   const comps = (f.competencias || []).map(c => ({...c}));
@@ -1160,6 +1191,7 @@ const IMPS = [
   {t:'profissionais', n:'Cadastro de profissionais', d:'O modelo já vem com todos os profissionais: preencha formação, registro, admissão, meta e competências.', c:'profissionais'},
   {t:'atendimentos', n:'Atendimentos / agenda', d:'Uma linha por sessão com status (realizado, falta…) e valor. Libera faltas, produtividade e faturamento.', c:'atendimentos'},
   {t:'avaliacoes', n:'Pesquisa de satisfação', d:'Notas de 0 a 10 por paciente e profissional. Libera NPS e satisfação.', c:'avaliacoes'},
+  {t:'hipo_sessoes', n:'Agenda diária do Hipo', d:'Arquivos <b>hipo-sessoes-AAAA-MM.json</b> (um por mês). Guarda o histórico de sessões de cada terapeuta e gera os <b>atendimentos</b> (realizados, faltas e desmarcações). Reimportar um mês substitui só aquele mês.', c:'atendimentos', json:true},
   {t:'hipo', n:'Cadastro do Hipo Saúde', d:'Arquivo <b>hipo-dados.json</b> extraído do Hipo. Casa cada terapeuta pelo nome, une cadastros duplicados, completa admissão, registro, carga horária, unidade e contratação (sem apagar o que já foi preenchido), atualiza quem está ativo e carrega a grade da semana usada na <b>Lotação</b>. Pode importar de novo sem duplicar.', c:'profissionais', json:true},
 ];
 function rImportar(){

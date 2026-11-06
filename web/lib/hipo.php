@@ -564,3 +564,133 @@ function lotacao(array $f = []): array
             'unidade' => $uni, 'totais' => $t, 'areas' => $areasL, 'profissionais' => $lista,
             'parametros' => ['sessoes_dia' => LOT_SESSOES_DIA, 'horas_dia' => LOT_HORAS_DIA, 'sessoes_por_hora' => round($porHora, 2)]];
 }
+
+// ------------------------------------------------------------------ histórico de sessões (agenda diária do Hipo)
+// Arquivos hipo-sessoes-AAAA-MM.json, um por mês, extraídos da agenda diária do Hipo (Matriz e Vila).
+// Tudo fica em hipo_sessoes (histórico completo, inclusive agendadas e desmarcadas); as sessões com desfecho
+// viram linhas de atendimentos (origem "hipo"), que alimentam faltas, produtividade e faturamento.
+
+// Status do Hipo => status de atendimentos (os demais — Aguardando, Congelado, Pendente… — só ficam no histórico)
+const HIPO_STATUS = [
+    'ATENDIDA' => 'realizado',
+    'FALTOU' => 'falta', 'FALTA INJUSTIFICAVEIS' => 'falta', 'FALTA INJUSTIFICAVEL' => 'falta',
+    'FALTA JUSTIFICAVEIS' => 'falta_justificada', 'FALTA JUSTIFICAVEL' => 'falta_justificada',
+    'DESMARCADA PELA CLINICA' => 'cancelado_clinica', 'CANCELADO PELA CLINICA' => 'cancelado_clinica', 'CANCELADA PELA CLINICA' => 'cancelado_clinica',
+];
+const HIPO_UNIDADES = [1 => 'Matriz', 2 => 'Vila'];
+
+function hipo_status_atend(?string $s): ?string
+{
+    $n = norm($s);
+    if (isset(HIPO_STATUS[$n])) {
+        return HIPO_STATUS[$n];
+    }
+    return str_starts_with($n, 'DESMARCADA PELO PACIENTE') || str_starts_with($n, 'CANCELADO PELO PACIENTE') ? 'cancelado_paciente' : null;
+}
+
+function importar_hipo_sessoes(string $bytes): array
+{
+    $d = json_decode($bytes, true);
+    if (!is_array($d) || ($d['origem'] ?? '') !== 'hipo-sessoes' || !is_array($d['sessoes'] ?? null) || !is_array($d['colunas'] ?? null)) {
+        throw new RuntimeException('Arquivo não reconhecido: use um hipo-sessoes-AAAA-MM.json extraído do Hipo.');
+    }
+    $col = array_flip($d['colunas']);
+    $v = fn(array $s, string $k) => $s[$col[$k]] ?? null;
+    $pdo = db();
+    $profs = [];
+    foreach (rows('SELECT hipo_id, MIN(id) id FROM profissionais WHERE hipo_id IS NOT NULL GROUP BY hipo_id') as $r) {
+        $profs[(int) $r['hipo_id']] = (int) $r['id'];
+    }
+    $n = $atend = $semProf = 0;
+    $datas = [];
+    $pacUlt = [];   // paciente => [data, convênio] da sessão mais recente (para o convênio do cadastro)
+    $pdo->beginTransaction();
+    try {
+        $ins = $pdo->prepare('INSERT OR REPLACE INTO hipo_sessoes(id, data, hora_inicio, hora_fim, hipo_prof, hipo_paciente, paciente, especialidade, convenio,
+                                sala, status, avaliacao, unidade, procedimento, codigo, tipo_guia, obs) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+        foreach ($d['sessoes'] as $s) {
+            $data = preg_match('/^(\d{2})-(\d{2})-(\d{4})$/', (string) $v($s, 'data'), $m) ? "$m[3]-$m[2]-$m[1]" : null;
+            if (!$data || !$v($s, 'id')) {
+                continue;
+            }
+            $datas[$data] = true;
+            $ins->execute([(int) $v($s, 'id'), $data, $v($s, 'hora_inicio'), $v($s, 'hora_fim'), (int) $v($s, 'id_prof'), $v($s, 'id_paciente') ?: null,
+                trim((string) $v($s, 'paciente')) ?: null, $v($s, 'especialidade'), trim((string) $v($s, 'convenio')) ?: null, $v($s, 'sala'),
+                trim((string) $v($s, 'status')) ?: null, trim((string) $v($s, 'avaliacao')) ?: null, HIPO_UNIDADES[(int) $v($s, 'id_clinica')] ?? null,
+                trim((string) $v($s, 'procedimento')) ?: null, $v($s, 'codigo') ? (string) $v($s, 'codigo') : null, $v($s, 'tipo_guia'),
+                trim((string) $v($s, 'obs_agenda')) ?: null]);
+            $n++;
+        }
+        // Refaz os atendimentos de origem Hipo nos dias deste arquivo (os lançados à mão ficam)
+        $dias = array_keys($datas);
+        sort($dias);
+        if ($dias) {
+            q("DELETE FROM atendimentos WHERE origem = 'hipo' AND data BETWEEN ? AND ?", [$dias[0], end($dias)]);
+            $pacIds = [];
+            foreach (rows('SELECT data, hipo_prof, paciente, convenio, status FROM hipo_sessoes WHERE data BETWEEN ? AND ? ORDER BY data, hora_inicio', [$dias[0], end($dias)]) as $s) {
+                $st = hipo_status_atend($s['status']);
+                if (!$st || !$s['paciente']) {
+                    continue;
+                }
+                $pid = $profs[(int) $s['hipo_prof']] ?? null;
+                if (!$pid) {
+                    $semProf++;
+                    continue;
+                }
+                $k = norm($s['paciente']);
+                $pacIds[$k] ??= pac_id($s['paciente'], null, 'inativo');
+                if ($s['convenio']) {
+                    $pacUlt[$pacIds[$k]] = $s['convenio'];
+                }
+                // dois atendimentos no mesmo dia, paciente e profissional contam uma vez (vale o melhor desfecho)
+                $r = q('INSERT OR IGNORE INTO atendimentos(data, paciente_id, profissional_id, status, origem) VALUES (?,?,?,?, ?)', [$s['data'], $pacIds[$k], $pid, $st, 'hipo']);
+                if ($r->rowCount()) {
+                    $atend++;
+                } elseif ($st === 'realizado') {
+                    q("UPDATE atendimentos SET status = 'realizado' WHERE data = ? AND paciente_id = ? AND profissional_id = ? AND origem = 'hipo'", [$s['data'], $pacIds[$k], $pid]);
+                }
+            }
+            foreach ($pacUlt as $pac => $conv) {
+                q('UPDATE pacientes SET convenio_id = COALESCE(convenio_id, ?) WHERE id = ?', [conv_id($conv), $pac]);
+            }
+        }
+        $ref = config_get('hipo_sessoes', ['de' => null, 'ate' => null]);
+        if ($dias) {
+            $ref = ['de' => min(array_filter([$ref['de'], $dias[0]])), 'ate' => max(array_filter([$ref['ate'], end($dias)]))];
+            config_set('hipo_sessoes', $ref + ['importado_em' => date('c')]);
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
+    }
+    return ['importados' => $n, 'atendimentos' => $atend,
+            'avisos' => ["$n sessões do Hipo" . ($dias ? ' de ' . implode('/', array_reverse(explode('-', $dias[0]))) . ' a ' . implode('/', array_reverse(explode('-', end($dias)))) : '') . "; $atend viraram atendimentos (realizados, faltas e desmarcações).",
+                         $semProf ? "$semProf sessões de profissionais fora do cadastro clínico ficaram só no histórico." : 'Todas as sessões com desfecho foram ligadas a um profissional.']];
+}
+
+/** Agenda do Hipo de um profissional: a semana pedida, mais o resumo mês a mês. */
+function hipo_agenda_prof(int $pid, ?string $semana = null): array
+{
+    $hid = one('SELECT hipo_id FROM profissionais WHERE id = ?', [$pid]);
+    $ref = config_get('hipo_sessoes');
+    if (!$hid || !$ref) {
+        return ['tem' => false];
+    }
+    $ultima = one('SELECT MAX(data) FROM hipo_sessoes WHERE hipo_prof = ? AND data <= ?', [$hid, date('Y-m-d')]) ?: date('Y-m-d');
+    $base = new DateTimeImmutable(preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $semana) ? $semana : $ultima);
+    $seg = $base->modify('-' . ((int) $base->format('N') - 1) . ' days');
+    $sab = $seg->modify('+5 days');
+    $sessoes = rows('SELECT data, hora_inicio, hora_fim, paciente, convenio, status, avaliacao, unidade, especialidade, procedimento
+                     FROM hipo_sessoes WHERE hipo_prof = ? AND data BETWEEN ? AND ? ORDER BY data, hora_inicio, paciente',
+                    [$hid, $seg->format('Y-m-d'), $sab->format('Y-m-d')]);
+    $meses = rows("SELECT substr(data, 1, 7) mes, COUNT(*) total,
+                     SUM(status = 'Atendida') atendidas,
+                     SUM(status IN ('Faltou', 'Falta Injustificáveis', 'Falta Justificáveis')) faltas,
+                     SUM(status LIKE 'Desmarcada%' OR status LIKE 'Cancelad%') desmarcadas,
+                     SUM(status = 'Atendida' AND (avaliacao IS NULL OR avaliacao <> 'Avaliada')) sem_evolucao,
+                     COUNT(DISTINCT hipo_paciente) pacientes
+                   FROM hipo_sessoes WHERE hipo_prof = ? GROUP BY 1 ORDER BY 1", [$hid]);
+    return ['tem' => true, 'semana' => $seg->format('Y-m-d'), 'sessoes' => $sessoes, 'meses' => $meses, 'periodo' => $ref,
+            'anterior' => $seg->modify('-7 days')->format('Y-m-d'), 'proxima' => $seg->modify('+7 days')->format('Y-m-d')];
+}
