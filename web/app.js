@@ -130,6 +130,7 @@ function go(){
   if (!$('s-' + section)) section = 'visao';
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('on', s.id === 's-' + section));
   document.querySelectorAll('nav.side a[data-s]').forEach(a => a.classList.toggle('on', a.dataset.s === section));
+  $('cfgBtn').classList.toggle('on', section === 'importar');
   const titles = {visao:'Visão geral do corpo clínico', ranking:'Ranking — melhores e piores', agenda:'Agenda — quem atende mais, novos e saídas', individual:'Painel individual', profissionais:'Equipe', areas:'Áreas / especialidades', perdas:'Perda de pacientes', pacientes:'Pacientes', satisfacao:'Satisfação', cadastros:'Cadastros', importar:'Importar dados', lotacao:'Lotação — capacidade e ocupação da clínica'};
   $('title').textContent = titles[section];
   if (D) renderSection();
@@ -1353,13 +1354,33 @@ $('ltUni').onchange = () => { LT_UNI = $('ltUni').value; rLotacao(); };
 $('ltBusca').oninput = deb(rLtProfs); $('ltEsp').onchange = () => { $('ltAreas').querySelectorAll('tr[data-e]').forEach(x => x.classList.toggle('sel', x.dataset.e === $('ltEsp').value)); rLtProfs(); }; $('ltFonte').onchange = rLtProfs; $('ltCsv').onclick = csvLotacao;
 $('plBusca').oninput = deb(rPerdas);
 $('sdBusca').oninput = deb(rSaidasTable); $('sdMot').onchange = rSaidasTable; $('sdCsv').onclick = csvSaidas;
+const escuroAgora = () => { const r = document.documentElement; return r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
+const temaTxt = () => { $('themeTxt').textContent = escuroAgora() ? 'Tema claro' : 'Tema escuro'; };
 $('theme').onclick = e => {
   e.preventDefault();
-  const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-  r.dataset.theme = dark ? 'light' : 'dark';
+  const r = document.documentElement;
+  r.dataset.theme = escuroAgora() ? 'light' : 'dark';
   try { localStorage.setItem('cc-theme', r.dataset.theme); } catch (_) {}
+  temaTxt(); fechaCfg();
   if (D) renderSection();
 };
+temaTxt();
+/* engrenagem: menu com importar, tema e sair, ao lado do menu lateral */
+function fechaCfg(){ $('cfgMenu').hidden = true; $('cfgBtn').setAttribute('aria-expanded', 'false'); }
+$('cfgBtn').onclick = e => {
+  e.preventDefault();
+  const m = $('cfgMenu');
+  if (!m.hidden) return fechaCfg();
+  m.hidden = false; $('cfgBtn').setAttribute('aria-expanded', 'true');
+  const b = $('cfgBtn').getBoundingClientRect(), h = m.offsetHeight;
+  m.style.left = (b.right + 8) + 'px';
+  m.style.top = Math.max(8, Math.min(b.bottom - h, innerHeight - h - 8)) + 'px';
+  m.querySelector('[role=menuitem]')?.focus();
+};
+$('cfgMenu').querySelectorAll('a[data-s]').forEach(a => a.onclick = () => fechaCfg());
+document.addEventListener('click', e => { if (!$('cfgMenu').hidden && !e.target.closest('#cfgMenu, #cfgBtn')) fechaCfg(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('cfgMenu').hidden) { fechaCfg(); $('cfgBtn').focus(); } });
+addEventListener('resize', fechaCfg);
 try { const t = localStorage.getItem('cc-theme'); if (t) document.documentElement.dataset.theme = t; } catch (_) {}
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => D && renderSection());
 window.addEventListener('hashchange', go);

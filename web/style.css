@@ -295,3 +295,16 @@ button.danger:hover{background:color-mix(in srgb,var(--bad) 10%,var(--surface))}
 .agl.vg{color:var(--muted);font-style:italic;border-bottom:0}
 .agu{font-size:10.5px;color:var(--muted)}
 .agver{margin-top:4px;padding:2px 8px;font-size:11.5px}
+
+/* menu lateral: rola em vez de cortar; compacta em telas baixas */
+nav.side{overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+nav.side::-webkit-scrollbar{display:none}
+nav.side a{flex:none}
+@media (max-height:860px){nav.side{gap:2px;padding:10px 0}nav.side .logo{width:38px;height:38px;margin-bottom:6px}nav.side a{padding:6px 2px}nav.side a svg{width:20px;height:20px}}
+@media (max-height:700px){nav.side a{font-size:0;gap:0;padding:8px 2px}}
+/* menu da engrenagem */
+.cfg-menu{position:fixed;z-index:60;min-width:200px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 30px #0004;padding:6px;display:grid;gap:2px}
+.cfg-menu[hidden]{display:none}
+.cfg-menu a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:var(--text);text-decoration:none;font-size:13.5px}
+.cfg-menu a svg{width:18px;height:18px;flex:none;color:var(--text-2)}
+.cfg-menu a:hover,.cfg-menu a:focus-visible{background:var(--surface-2);outline:none}
