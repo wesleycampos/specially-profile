@@ -138,6 +138,15 @@ function renderSection(){
   ({visao:rVisao, ranking:rRanking, agenda:rAgenda, individual:rIndividual, profissionais:rEquipe, areas:rAreas, perdas:rPerdas, pacientes:rPacientes, satisfacao:rSatisfacao, cadastros:rCadastros, importar:rImportar, lotacao:rLotacao})[section]();
 }
 
+/* Clique numa área filtra o painel; clicar de novo na mesma área tira o filtro */
+function alternaArea(id, nome){
+  const sai = $('fEsp').value === String(id);
+  $('fEsp').value = sai ? '' : id; refresh();
+  toast(sai ? 'Filtro de área removido' : `Filtrando pela área: ${nome} — clique de novo para tirar`, 2500);
+}
+const areaSel = id => $('fEsp').value === String(id) ? 'sel' : '';
+const AREA_TIP = 'title="Clique para filtrar por esta área; clique de novo para tirar o filtro"';
+
 /* ---------------- VISÃO GERAL ---------------- */
 const ICON = {
   out:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>',
@@ -353,8 +362,8 @@ function rAgenda(){
 
   // áreas
   $('agAreas').innerHTML = `<thead><tr><th>Área</th><th class="num">Prof.</th><th class="num">Atend.</th><th class="num">Por prof.</th><th class="num">Ocupação</th><th class="num">Novos</th><th class="num">Perdas</th></tr></thead><tbody>` +
-    AG.areas.map(a => `<tr class="click" data-e="${a.id}"><td><span class="tag"><span class="sw" style="background:${espColor(a.id)}"></span>${esc(a.nome)}</span></td><td class="num">${a.profissionais}</td><td class="num">${a.atendimentos}</td><td class="num">${fmt(a.por_prof)}</td><td class="num">${pctf(a.ocupacao)}</td><td class="num">${a.novos}</td><td class="num">${a.perdas}</td></tr>`).join('') + '</tbody>';
-  $('agAreas').querySelectorAll('tr[data-e]').forEach(tr => tr.onclick = () => { $('fEsp').value = tr.dataset.e; refresh(); });
+    AG.areas.map(a => `<tr class="click ${areaSel(a.id)}" data-e="${a.id}" ${AREA_TIP}><td><span class="tag"><span class="sw" style="background:${espColor(a.id)}"></span>${esc(a.nome)}</span></td><td class="num">${a.profissionais}</td><td class="num">${a.atendimentos}</td><td class="num">${fmt(a.por_prof)}</td><td class="num">${pctf(a.ocupacao)}</td><td class="num">${a.novos}</td><td class="num">${a.perdas}</td></tr>`).join('') + '</tbody>';
+  $('agAreas').querySelectorAll('tr[data-e]').forEach(tr => tr.onclick = () => alternaArea(tr.dataset.e, tr.querySelector('td').textContent.trim()));
 
   rAgLista(); rAgTabela(); rSala();
   ['agPodBest','agBest','agPodWorst','agWorst'].forEach(id => bindProfClicks($(id)));
@@ -749,11 +758,11 @@ function rAreas(){
   const f = {saidas_por_prof:fmt, pct_faltas_saida:pctf, taxa_perda:pctf, taxa_falta:pctf, faturamento:money, fat_por_prof:money};
   const rows = [...D.areas].sort((x,y) => { const u = x[arSort.k], v = y[arSort.k]; return (typeof u === 'string' ? u.localeCompare(v) : (u ?? -1) - (v ?? -1)) * arSort.d; });
   $('areasTable').innerHTML = `<thead><tr>${cols.map(([k,l]) => `<th data-k="${k}" class="${k==='nome'||k==='motivo_top'?'':'num'}">${l}${arSort.k===k?(arSort.d>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>` +
-    rows.map(x => `<tr class="click" data-e="${x.id}">${cols.map(([k]) => k === 'nome' ? `<td><span class="tag"><span class="sw" style="background:${espColor(x.id)}"></span>${esc(x.nome)}</span></td>`
+    rows.map(x => `<tr class="click ${areaSel(x.id)}" data-e="${x.id}" ${AREA_TIP}>${cols.map(([k]) => k === 'nome' ? `<td><span class="tag"><span class="sw" style="background:${espColor(x.id)}"></span>${esc(x.nome)}</span></td>`
       : k === 'motivo_top' ? `<td>${x.motivo_top ? `<span class="tag"><span class="sw" style="background:${motColor(x.motivo_top)}"></span>${esc(x.motivo_top)}</span>` : '—'}</td>`
       : `<td class="num">${(f[k] || fmt)(x[k])}</td>`).join('')}</tr>`).join('') + '</tbody>';
   $('areasTable').querySelectorAll('th').forEach(th => th.onclick = () => { arSort = {k:th.dataset.k, d: arSort.k === th.dataset.k ? -arSort.d : -1}; rAreas(); });
-  $('areasTable').querySelectorAll('tr[data-e]').forEach(tr => tr.onclick = () => { $('fEsp').value = tr.dataset.e; refresh(); toast('Filtrando pela área: ' + tr.querySelector('td').textContent.trim()); });
+  $('areasTable').querySelectorAll('tr[data-e]').forEach(tr => tr.onclick = () => alternaArea(tr.dataset.e, tr.querySelector('td').textContent.trim()));
   const s1 = [...D.areas].filter(x => x.saidas_por_prof != null).sort((x,y) => y.saidas_por_prof - x.saidas_por_prof);
   hbar('cAreaSP', s1.map(x => x.nome), s1.map(x => x.saidas_por_prof), s1.map(x => espColor(x.id)), fmt);
   const s2 = [...D.areas].filter(x => x.pct_faltas_saida != null).sort((x,y) => y.pct_faltas_saida - x.pct_faltas_saida);
@@ -1225,9 +1234,15 @@ async function rLotacao(){
     kpi('users', 'Pacientes na semana', fmt(t.pacientes), `${fmt(t.sessoes)} sessões`) +
     kpi('star', 'Lotação máxima', fmt(t.lotacao_pacientes) + ' <span style="font-size:13px;font-weight:400">pacientes</span>', t.vagas_pacientes != null ? `cabem mais ${fmt(t.vagas_pacientes)}` : '');
   $('ltAreas').innerHTML = `<thead><tr><th>Área</th><th class="num">Ativos</th><th class="num">Com agenda</th><th class="num">Capacidade</th><th class="num">Ocupados</th><th class="num">Livres</th><th class="num">Uso da capacidade</th><th class="num">Pacientes</th><th class="num">Horários por paciente</th><th class="num">Vagas</th><th class="num">Lotação máxima</th></tr></thead><tbody>` +
-    L.areas.map(a => `<tr class="click" data-e="${a.id}"><td><span class="tag"><span class="sw" style="background:${espColor(a.id)}"></span>${esc(a.nome)}</span>${a.sem_dados ? ` <span class="st-warn" title="Ativos sem carga horária nem agenda">· ${a.sem_dados} sem dados</span>` : ''}${a.apoio ? ` <span style="color:var(--muted)">· ${a.apoio} apoio</span>` : ''}</td><td class="num">${a.ativos}</td><td class="num">${a.com_agenda}</td><td class="num">${fmt(a.capacidade)}</td><td class="num">${fmt(a.ocupados + a.bloqueados)}</td><td class="num">${fmt(a.livres)}</td><td class="num">${ocBar(a.ocupacao)}</td><td class="num">${fmt(a.pacientes)}</td><td class="num">${fmt(a.por_paciente)}</td><td class="num">${fmt(a.vagas_pacientes)}</td><td class="num"><b>${fmt(a.lotacao_pacientes)}</b></td></tr>`).join('') +
+    L.areas.map(a => `<tr class="click ${$('ltEsp').value === String(a.id) ? 'sel' : ''}" data-e="${a.id}" title="Clique para ver só os terapeutas desta área; clique de novo para ver todos"><td><span class="tag"><span class="sw" style="background:${espColor(a.id)}"></span>${esc(a.nome)}</span>${a.sem_dados ? ` <span class="st-warn" title="Ativos sem carga horária nem agenda">· ${a.sem_dados} sem dados</span>` : ''}${a.apoio ? ` <span style="color:var(--muted)">· ${a.apoio} apoio</span>` : ''}</td><td class="num">${a.ativos}</td><td class="num">${a.com_agenda}</td><td class="num">${fmt(a.capacidade)}</td><td class="num">${fmt(a.ocupados + a.bloqueados)}</td><td class="num">${fmt(a.livres)}</td><td class="num">${ocBar(a.ocupacao)}</td><td class="num">${fmt(a.pacientes)}</td><td class="num">${fmt(a.por_paciente)}</td><td class="num">${fmt(a.vagas_pacientes)}</td><td class="num"><b>${fmt(a.lotacao_pacientes)}</b></td></tr>`).join('') +
     `<tr style="font-weight:650"><td>Clínica</td><td class="num">${t.ativos}</td><td class="num">${t.com_agenda}</td><td class="num">${fmt(t.capacidade)}</td><td class="num">${fmt(t.ocupados + t.bloqueados)}</td><td class="num">${fmt(t.livres)}</td><td class="num">${ocBar(t.ocupacao)}</td><td class="num">${fmt(t.pacientes)}</td><td class="num">${t.pacientes ? fmt(t.ocupados / t.pacientes) : '—'}</td><td class="num">${fmt(t.vagas_pacientes)}</td><td class="num">${fmt(t.lotacao_pacientes)}</td></tr></tbody>`;
-  $('ltAreas').querySelectorAll('tr[data-e]').forEach(tr => tr.onclick = () => { $('ltEsp').value = tr.dataset.e; rLtProfs(); $('ltProfs').scrollIntoView({behavior:'smooth', block:'start'}); });
+  $('ltAreas').querySelectorAll('tr[data-e]').forEach(tr => tr.onclick = () => {
+    const sai = $('ltEsp').value === tr.dataset.e;
+    $('ltEsp').value = sai ? '' : tr.dataset.e;
+    $('ltAreas').querySelectorAll('tr[data-e]').forEach(x => x.classList.toggle('sel', !sai && x === tr));
+    rLtProfs();
+    if (!sai) $('ltProfs').scrollIntoView({behavior:'smooth', block:'start'});
+  });
   const esps = [...new Map(L.profissionais.map(p => [p.esp_id, p.esp])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   const ev = $('ltEsp').value;
   $('ltEsp').innerHTML = '<option value="">Todas as áreas</option>' + esps.map(([id, n]) => `<option value="${id}" ${String(id) === ev ? 'selected' : ''}>${esc(n)}</option>`).join('');
@@ -1335,7 +1350,7 @@ $('agSoMarc').onchange = rGrade; $('agVagos').onchange = rGrade; $('agSalaBusca'
 $('indBusca').oninput = deb(rIndividual);
 $('pcBusca').oninput = deb(rEquipe); $('pcSort').onchange = rEquipe; $('pcMov').onchange = rEquipe; $('pcSit').onchange = rEquipe;
 $('ltUni').onchange = () => { LT_UNI = $('ltUni').value; rLotacao(); };
-$('ltBusca').oninput = deb(rLtProfs); $('ltEsp').onchange = rLtProfs; $('ltFonte').onchange = rLtProfs; $('ltCsv').onclick = csvLotacao;
+$('ltBusca').oninput = deb(rLtProfs); $('ltEsp').onchange = () => { $('ltAreas').querySelectorAll('tr[data-e]').forEach(x => x.classList.toggle('sel', x.dataset.e === $('ltEsp').value)); rLtProfs(); }; $('ltFonte').onchange = rLtProfs; $('ltCsv').onclick = csvLotacao;
 $('plBusca').oninput = deb(rPerdas);
 $('sdBusca').oninput = deb(rSaidasTable); $('sdMot').onchange = rSaidasTable; $('sdCsv').onclick = csvSaidas;
 $('theme').onclick = e => {
