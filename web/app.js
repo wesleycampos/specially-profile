@@ -430,7 +430,7 @@ function rSalaConteudo(){
 
 /* ---------------- grade da semana: três visões ----------------
    Por terapeuta (linha = terapeuta, coluna = dia), Ocupação (mapa hora × dia, clique abre o horário) e Grade (hora × dia enxuta). */
-let GRADE_SLOTS = [], GRADE_UNI = '', GRADE_BUSCA = false, gradeCel = null;
+let GRADE_SLOTS = [], GRADE_UNI = '', GRADE_BUSCA = false;
 let gradeModo = (() => { try { return localStorage.getItem('agGradeModo') || 'terapeuta'; } catch { return 'terapeuta'; } })();
 const agFlags = p => Object.keys(agBadge).filter(k => +p[k]);
 const nomeCurto = n => { const w = String(n || '').trim().split(/\s+/); return w.length > 2 ? `${w[0]} ${w[w.length - 1]}` : w.join(' '); };
@@ -489,17 +489,21 @@ function gradeMapa(box, dias){
   };
   box.innerHTML = `<div class="tablewrap" style="max-height:520px"><table class="agmapa"><thead><tr><th>Hora</th>${dias.map(d => `<th>${DIAS[d]}</th>`).join('')}</tr></thead><tbody>` +
     horas.map(h => `<tr><td class="num"><b>${h}</b></td>${dias.map(d => { const c = cel(d, h); if (!c.tot) return '<td></td>';
-      const r = c.oc / c.tot, sel = gradeCel && gradeCel[0] === d && gradeCel[1] === h;
-      return `<td><button class="mc ${sel ? 'sel' : ''}" data-d="${d}" data-h="${h}" style="background:color-mix(in srgb, var(--brand) ${Math.round(12 + 70 * r)}%, var(--surface))${r > 0.55 ? ';color:#fff' : ''}" title="${c.oc} de ${c.tot} horários ocupados · ${c.pac} pacientes${c.marc ? ' · ' + c.marc + ' com marcação' : ''}">
+      const r = c.oc / c.tot;
+      return `<td><button class="mc" data-d="${d}" data-h="${h}" style="background:color-mix(in srgb, var(--brand) ${Math.round(12 + 70 * r)}%, var(--surface))${r > 0.55 ? ';color:#fff' : ''}" title="${c.oc} de ${c.tot} horários ocupados · ${c.pac} pacientes${c.marc ? ' · ' + c.marc + ' com marcação' : ''}">
         <b>${c.oc}/${c.tot}</b><small>${soMarc ? (c.marc ? c.marc + ' marc.' : '—') : c.pac + ' pac'}</small></button></td>`; }).join('')}</tr>`).join('') +
-    `</tbody></table></div><div id="agMapaDet"></div>`;
-  box.querySelectorAll('.mc').forEach(b => b.onclick = () => { gradeCel = [+b.dataset.d, b.dataset.h]; gradeMapa(box, dias); });
-  if (gradeCel) {
-    const [d, h] = gradeCel, ss = gradeSlots().filter(s => s.dia === d && s.hora === h).sort((a, b) => a.prof.localeCompare(b.prof));
-    $('agMapaDet').innerHTML = `<div class="card-head" style="margin-top:12px"><h3 class="agsub" style="margin:0">${DIAS[d]} · ${esc(h)} — ${ss.filter(s => s.pacientes.length).length} ocupados</h3><button id="agMapaFecha">Fechar</button></div>
-      <div class="agdet">${ss.map(s => `<div class="agc ${s.modalidade === 'grupo' ? 'grp' : ''} ${s.pacientes.length ? '' : 'vago'}"><div class="agt">${esc(s.prof)}${GRADE_UNI ? '' : ` <span>${esc(s.unidade)}</span>`}</div>${s.pacientes.length ? s.pacientes.map(p => `<div>${esc(p.nome)} ${agFlags(p).map(agTag).join(' ')}</div>`).join('') : 'vago'}</div>`).join('') || '<div class="empty">Nada neste horário com esses filtros.</div>'}</div>`;
-    $('agMapaFecha').onclick = () => { gradeCel = null; gradeMapa(box, dias); };
-  }
+    `</tbody></table></div>`;
+  box.querySelectorAll('.mc').forEach(b => b.onclick = () => gradeMapaPopup(+b.dataset.d, b.dataset.h));
+}
+// detalhe de um horário do mapa em janela, sem rolar a página
+function gradeMapaPopup(d, h){
+  const ss = gradeSlots().filter(s => s.dia === d && s.hora === h).sort((a, b) => a.prof.localeCompare(b.prof));
+  const oc = ss.filter(s => s.pacientes.length), dlg = $('dlg');
+  dlg.innerHTML = `<div class="mhead"><h2 style="flex:1">${DIAS[d]} · ${esc(h)}</h2><span class="hint" style="margin:0">${oc.length} ocupados · ${oc.reduce((n, s) => n + s.pacientes.length, 0)} pacientes${ss.length > oc.length ? ` · ${ss.length - oc.length} vagos` : ''}</span><button class="ghost" id="mClose" aria-label="Fechar">✕</button></div>
+    <div class="mbody"><div class="agdet">${ss.map(s => `<div class="agc ${s.modalidade === 'grupo' ? 'grp' : ''} ${s.pacientes.length ? '' : 'vago'}"><div class="agt"><a href="#" data-p="${s.prof_id}" style="color:inherit;text-decoration:none">${esc(s.prof)}</a>${GRADE_UNI ? '' : ` <span>${esc(s.unidade)}</span>`}${s.modalidade === 'grupo' ? ' <span>· grupo</span>' : ''}</div>${s.pacientes.length ? s.pacientes.map(p => `<div>${esc(p.nome)} ${agFlags(p).map(agTag).join(' ')}</div>`).join('') : 'vago'}</div>`).join('') || '<div class="empty">Nada neste horário com esses filtros.</div>'}</div></div>`;
+  $('mClose').onclick = () => dlg.close();
+  dlg.querySelectorAll('[data-p]').forEach(el => el.onclick = e => { e.preventDefault(); dlg.close(); openProf(+el.dataset.p); });
+  if (!dlg.open) dlg.showModal();
 }
 function gradeHora(box, slots, dias){
   const horas = [...new Set(slots.map(s => s.hora))].sort();
