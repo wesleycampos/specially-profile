@@ -145,6 +145,9 @@ tipBox.className = 'ii-tip'; tipBox.setAttribute('role', 'tooltip'); tipBox.hidd
 document.addEventListener('DOMContentLoaded', () => document.body.appendChild(tipBox));
 let tipFor = null;
 function showTip(i){
+  // janelas abertas (ficha, cadastro) ficam numa camada acima da página: o balão precisa estar dentro delas
+  const casa = i.closest('dialog[open]') || document.body;
+  if (tipBox.parentNode !== casa) casa.appendChild(tipBox);
   tipFor = i; tipBox.textContent = i.dataset.tip; tipBox.hidden = false;
   const r = i.getBoundingClientRect(), w = Math.min(320, innerWidth - 24);
   tipBox.style.width = w + 'px';

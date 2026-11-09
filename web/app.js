@@ -445,8 +445,8 @@ let gradeModo = (() => { try { return localStorage.getItem('agGradeModo') || 'te
 const agFlags = p => Object.keys(agBadge).filter(k => +p[k]);
 const nomeCurto = n => { const w = String(n || '').trim().split(/\s+/); return w.length > 2 ? `${w[0]} ${w[w.length - 1]}` : w.join(' '); };
 function gradeSlots(){
-  const soMarc = $('agSoMarc').checked, vagos = $('agVagos').checked && !GRADE_BUSCA;
-  return GRADE_SLOTS.filter(s => s.pacientes.length ? (!soMarc || s.pacientes.some(p => agFlags(p).length)) : (vagos && !soMarc && s.situacao !== 'fechado'));
+  const soMarc = $('agSoMarc').checked, vagos = $('agVagos').checked && !GRADE_BUSCA, ter = norm($('agGradeBusca').value.trim());
+  return GRADE_SLOTS.filter(s => (!ter || norm(s.prof).includes(ter)) && (s.pacientes.length ? (!soMarc || s.pacientes.some(p => agFlags(p).length)) : (vagos && !soMarc && s.situacao !== 'fechado')));
 }
 function rGrade(){
   $('agGradeModo').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === gradeModo));
@@ -455,7 +455,7 @@ function rGrade(){
     : `<span class="gc nv">novo</span><span class="gc sd">de saída</span><span class="gc aj">ajuste / retorno / sem aut.</span><span class="gc grp">grupo</span><span class="gc vg">vago</span>`;
   const slots = gradeSlots();
   const box = $('agGradeBox');
-  if (!slots.length) { box.innerHTML = '<div class="empty">Nenhum horário com esses filtros.</div>'; return; }
+  if (!slots.length) { box.innerHTML = `<div class="empty">${$('agGradeBusca').value.trim() ? `Nenhum terapeuta com "${esc($('agGradeBusca').value.trim())}" nesta área ou sala.` : 'Nenhum horário com esses filtros.'}</div>`; return; }
   const dias = [1,2,3,4,5,6].filter(d => GRADE_SLOTS.some(s => s.dia === d));
   if (gradeModo === 'terapeuta') return gradeTerapeuta(box, slots, dias);
   if (gradeModo === 'mapa') return gradeMapa(box, dias);
@@ -489,7 +489,8 @@ function gradeTerapeuta(box, slots, dias){
   bindProfClicks(box);
 }
 function gradeMapa(box, dias){
-  const base = GRADE_SLOTS.filter(s => s.situacao !== 'fechado');
+  const ter = norm($('agGradeBusca').value.trim());
+  const base = GRADE_SLOTS.filter(s => s.situacao !== 'fechado' && (!ter || norm(s.prof).includes(ter)));
   const soMarc = $('agSoMarc').checked;
   const horas = [...new Set(base.map(s => s.hora))].sort();
   const cel = (d, h) => {
@@ -1347,7 +1348,7 @@ $('agSalaModo').querySelectorAll('button').forEach(b => b.onclick = () => { sala
 $('agSalaSel').onchange = () => { salaValor[salaModo] = $('agSalaSel').value; $('agSalaProf').value = ''; rSala(); };
 $('agSalaProf').onchange = rSalaConteudo;
 $('agGradeModo').querySelectorAll('button').forEach(b => b.onclick = () => { gradeModo = b.dataset.v; try { localStorage.setItem('agGradeModo', gradeModo); } catch {} rGrade(); });
-$('agSoMarc').onchange = rGrade; $('agVagos').onchange = rGrade; $('agSalaBusca').oninput = deb(rSalaConteudo); $('agBusca').oninput = deb(rAgTabela); $('agLsBusca').oninput = deb(rAgLista); $('agCsv').onclick = csvAgenda;
+$('agSoMarc').onchange = rGrade; $('agVagos').onchange = rGrade; $('agGradeBusca').oninput = deb(rGrade); $('agSalaBusca').oninput = deb(rSalaConteudo); $('agBusca').oninput = deb(rAgTabela); $('agLsBusca').oninput = deb(rAgLista); $('agCsv').onclick = csvAgenda;
 $('indBusca').oninput = deb(rIndividual);
 $('pcBusca').oninput = deb(rEquipe); $('pcSort').onchange = rEquipe; $('pcMov').onchange = rEquipe; $('pcSit').onchange = rEquipe;
 $('ltUni').onchange = () => { LT_UNI = $('ltUni').value; rLotacao(); };
