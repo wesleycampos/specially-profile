@@ -174,6 +174,21 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS login_attempts (ip TEXT NOT NULL, ts INTEGER NOT NULL);
 
 -- Configurações e referências gerais (valor em JSON)
+-- Tabela de remuneração do terapeuta: cada linha vale a partir de "desde" (reajuste = linha nova)
+CREATE TABLE IF NOT EXISTS remuneracao (
+  id               INTEGER PRIMARY KEY,
+  profissional_id  INTEGER NOT NULL REFERENCES profissionais(id) ON DELETE CASCADE,
+  desde            TEXT NOT NULL,      -- início da vigência (AAAA-MM-DD)
+  tipo             TEXT NOT NULL CHECK (tipo IN ('fixo','hora','sessao','percentual')),
+  valor            REAL NOT NULL,      -- R$ por mês / por hora / por sessão, ou % do recebido
+  obs              TEXT,
+  simulado         INTEGER NOT NULL DEFAULT 0,  -- 1 = valor de teste, apagado ao carregar a tabela real
+  UNIQUE (profissional_id, desde)
+);
+-- editar uma linha simulada pela tela de Cadastros a torna real
+CREATE TRIGGER IF NOT EXISTS remuneracao_real AFTER UPDATE OF desde, tipo, valor ON remuneracao WHEN OLD.simulado = 1
+BEGIN UPDATE remuneracao SET simulado = 0 WHERE id = NEW.id; END;
+
 CREATE TABLE IF NOT EXISTS config (
   chave  TEXT PRIMARY KEY,
   valor  TEXT

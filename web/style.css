@@ -308,3 +308,20 @@ nav.side a{flex:none}
 .cfg-menu a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:var(--text);text-decoration:none;font-size:13.5px}
 .cfg-menu a svg{width:18px;height:18px;flex:none;color:var(--text-2)}
 .cfg-menu a:hover,.cfg-menu a:focus-visible{background:var(--surface-2);outline:none}
+
+/* repasse */
+.rp-filtros{gap:8px;align-items:center}
+.rp-cmp,.rp-ver{display:inline-flex;align-items:center;gap:6px}
+.rp-cmp[hidden],.rp-ver[hidden]{display:none}
+.tag.rp-fixo{background:color-mix(in srgb,var(--s7) 16%,transparent)}
+.tag.rp-hora{background:color-mix(in srgb,var(--s1) 16%,transparent)}
+.tag.rp-sessao{background:color-mix(in srgb,var(--s3) 16%,transparent)}
+.tag.rp-percentual{background:color-mix(in srgb,var(--s4) 18%,transparent)}
+.rp-form{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+#rpCfg summary{cursor:pointer;list-style:none}
+#rpCfg summary::-webkit-details-marker{display:none}
+#rpCfg summary::before{content:'▸ ';color:var(--muted)}
+#rpCfg[open] summary::before{content:'▾ '}
+label.chk{flex-direction:row;align-items:center;gap:8px}
+.notice.warn{border-color:var(--warn)}
+#topFiltros[hidden]{display:none}

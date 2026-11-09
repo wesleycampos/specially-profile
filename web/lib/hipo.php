@@ -177,7 +177,7 @@ function config_set(string $k, $v): void
 }
 
 // ------------------------------------------------------------------ união de cadastros duplicados
-const PROF_REFS = ['saida_profissionais', 'vinculos', 'atendimentos', 'avaliacoes', 'grupos', 'competencias', 'agenda_slots'];
+const PROF_REFS = ['saida_profissionais', 'vinculos', 'atendimentos', 'avaliacoes', 'grupos', 'competencias', 'agenda_slots', 'remuneracao'];
 const PROF_COPIAR = ['formacao', 'pos_graduacao', 'registro_conselho', 'data_admissao', 'carga_horaria_semanal', 'meta_pacientes', 'foto_url',
                      'observacoes', 'hipo_id', 'nome_completo', 'unidade', 'contratacao', 'capacidade_semanal'];
 

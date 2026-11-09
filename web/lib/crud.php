@@ -39,6 +39,11 @@ function crud_tabelas(): array
             ['nome', 'Nome', 'text', true], ['abrev', 'Abreviação', 'text', false]]],
         'convenios' => ['titulo' => 'Convênios', 'ordem' => 't.nome', 'campos' => [
             ['nome', 'Nome', 'text', true], ['valor_sessao', 'Valor por sessão (R$)', 'num', false]]],
+        'remuneracao' => ['titulo' => 'Remuneração dos terapeutas', 'ordem' => 'profissional_id_rotulo, t.desde DESC', 'campos' => [
+            ['profissional_id', 'Terapeuta', 'fk:profissionais', true], ['desde', 'Vale a partir de', 'date', true],
+            ['tipo', 'Forma de pagamento', 'sel:fixo|hora|sessao|percentual', true], ['valor', 'Valor (R$ mês / hora / sessão, ou %)', 'num', true],
+            ['obs', 'Observação', 'text', false]],
+            'aviso' => 'Cada linha vale a partir da data informada até a próxima linha do mesmo terapeuta. Para um reajuste, crie uma linha nova: os meses anteriores continuam com o valor antigo. Tipos: fixo = valor mensal; hora = R$ por hora atendida; sessao = R$ por sessão; percentual = % do valor recebido.'],
         'agenda_versoes' => ['titulo' => 'Agendas importadas', 'ordem' => 't.unidade, t.data_ref DESC', 'campos' => [
             ['unidade', 'Unidade', 'text', true], ['data_ref', 'Agenda de', 'date', true], ['arquivo', 'Arquivo', 'text', false]],
             'sem_criar' => true, 'aviso' => 'Excluir uma agenda apaga os horários dela; a mais recente de cada unidade é a carteira ativa.'],

@@ -470,6 +470,7 @@ function profissional(int $pid): ?array
                            WHERE v.profissional_id=? AND v.data_fim IS NULL AND pa.status='ativo' ORDER BY inicio", [$pid]);
     $r['atend_mes'] = rows("SELECT substr(data,1,7) mes, SUM(status='realizado') sessoes, SUM(status IN ('falta','falta_justificada')) faltas
                             FROM atendimentos WHERE profissional_id=? GROUP BY 1 ORDER BY 1", [$pid]);
+    $r['remuneracao'] = rows('SELECT id, desde, tipo, valor, obs, simulado FROM remuneracao WHERE profissional_id=? ORDER BY desde DESC', [$pid]);
     $r['avaliacoes'] = rows('SELECT a.data, a.nota, a.comentario, pa.nome paciente FROM avaliacoes a LEFT JOIN pacientes pa ON pa.id=a.paciente_id
                              WHERE a.profissional_id=? ORDER BY a.data DESC LIMIT 50', [$pid]);
     return $r;

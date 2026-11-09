@@ -102,6 +102,14 @@ O Hipo Saúde (https://specially.hiposaudeintegrada.com.br) vai ser descontinuad
 - **Ajuste fino:** na tabela *Capacidade por terapeuta*, preencha a carga horária ou a capacidade de quem está "sem dados". O total recalcula na hora.
 - Parâmetros: `LOT_SESSOES_DIA`, `LOT_HORAS_DIA` e `LOT_DIAS_MAX` em `web/lib/hipo.php`.
 
+## Repasse (aba Repasse)
+Quanto a clínica paga a cada terapeuta e quanto recebe pelas sessões dele, mês a mês. Código em `web/lib/repasse.php`.
+- **Tabela de remuneração** (`remuneracao`): uma linha por terapeuta e vigência (`desde`). Formas: `fixo` (valor mensal), `hora` (R$ por hora atendida), `sessao` (R$ por sessão realizada) e `percentual` (% do recebido). Reajuste = linha nova; os meses anteriores continuam com o valor antigo. Edita-se na ficha do terapeuta (**Editar cadastro → Remuneração** ou **Ver mês a mês / alterar**) e em **Cadastros → Remuneração**.
+- **Cálculo** (sozinho, a cada consulta): horas = sessões realizadas × duração da sessão (padrão 45 min); fixo é pago do início da vigência enquanto o terapeuta está ativo (ou até o último mês com sessão). Opção de pagar falta sem justificativa como sessão.
+- **Recebido** = valor do atendimento; se vazio, valor por sessão do convênio do paciente; se vazio, o valor padrão. Tudo ajustável em **Regras do cálculo**, no fim da tela (config `repasse` na tabela `config`).
+- **Telas:** comparar dois meses (pago, recebido, resultado, % de repasse, custo por sessão, por área e por terapeuta com variação) ou mês a mês (matriz por área e por terapeuta). CSV com tudo.
+- **Dados simulados:** `POST api/repasse/simular` cria valores de teste (`simulado = 1`, e o valor dos convênios que estavam vazios, guardado em `config.repasse_sim_conv`); o botão **Apagar dados simulados** remove só isso. Editar uma linha simulada a torna real.
+
 ## Cadastros (criar, editar, excluir)
 A aba **Cadastros** tem uma aba para cada tabela:
 - **Profissionais:** tela própria, com foto, competências e grupos. Tem **Excluir** e **Unir com outro cadastro** (junta duplicados sem perder histórico).

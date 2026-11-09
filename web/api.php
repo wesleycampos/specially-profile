@@ -9,6 +9,7 @@ require __DIR__ . '/lib/painel.php';
 require __DIR__ . '/lib/agenda.php';
 require __DIR__ . '/lib/hipo.php';
 require __DIR__ . '/lib/crud.php';
+require __DIR__ . '/lib/repasse.php';
 
 security_headers();
 set_time_limit(120);
@@ -69,6 +70,12 @@ try {
         }
         if ($r === 'lotacao') {
             send(200, lotacao($_GET));
+        }
+        if ($r === 'repasse') {
+            send(200, repasse($_GET));
+        }
+        if (preg_match('#^repasse/prof/(\d+)$#', $r, $m)) {
+            send(200, repasse(['prof' => (int) $m[1], 'de' => $_GET['de'] ?? '2000-01']) + ['historico' => remuneracao_prof((int) $m[1])]);
         }
         if ($r === 'conciliacao') {
             send(200, conciliacao(!empty($_GET['inativos'])));
@@ -131,6 +138,15 @@ try {
             }
             send(200, $fn($bytes));
         }
+        if ($r === 'remuneracao') {
+            send(200, remuneracao_salvar(body_json()));
+        }
+        if ($r === 'repasse/simular') {
+            send(200, repasse_simular());
+        }
+        if ($r === 'repasse/limpar-simulados') {
+            send(200, repasse_limpar_simulados());
+        }
         if ($r === 'profissional') {
             send(200, salvar_prof(null, body_json()));
         }
@@ -170,12 +186,16 @@ try {
                 [$mod, $mod === 'grupo' ? (($b['grupo_id'] ?? null) ?: null) : null, (int) $m[1], (int) $m[2]]);
             send(200, ['ok' => true]);
         }
+        if ($r === 'repasse/config') {
+            send(200, repasse_salvar_config(body_json()));
+        }
         if (preg_match('#^crud/([a-z_]+)/(\d+)$#', $r, $m)) {
             send(200, crud_salvar($m[1], (int) $m[2], body_json()));
         }
         if (preg_match('#^convenio/(\d+)$#', $r, $m)) {
             $v = body_json()['valor_sessao'] ?? null;
             q('UPDATE convenios SET valor_sessao=? WHERE id=?', [is_numeric($v) ? (float) $v : null, (int) $m[1]]);
+            config_set('repasse_sim_conv', array_values(array_diff((array) config_get('repasse_sim_conv', []), [(int) $m[1]])));   // valor digitado deixa de ser simulado
             send(200, ['ok' => true]);
         }
     }

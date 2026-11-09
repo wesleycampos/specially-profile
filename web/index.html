@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Specially Profile</title>
 <meta name="robots" content="noindex,nofollow">
-<link rel="stylesheet" href="style.css?v=18">
+<link rel="stylesheet" href="style.css?v=19">
 <script src="vendor/chart.umd.min.js"></script>
 </head>
 <body>
@@ -16,6 +16,7 @@
   <a href="#agenda" data-s="agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M7 13h3M14 13h3M7 17h3"/></svg>Agenda</a>
   <a href="#profissionais" data-s="profissionais"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 14.5a5 5 0 0 1 6 5"/></svg>Equipe</a>
   <a href="#lotacao" data-s="lotacao"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-6"/><circle cx="12" cy="18" r="1.5"/></svg>Lotação</a>
+  <a href="#repasse" data-s="repasse"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 10v5M18 10v5"/></svg>Repasse</a>
   <a href="#individual" data-s="individual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M5 21v-1a7 7 0 0 1 14 0v1"/><path d="M16 14l2 2 4-4"/></svg>Individual</a>
   <a href="#areas" data-s="areas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Áreas</a>
   <a href="#perdas" data-s="perdas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l6 6 4-4 8 8"/><path d="M21 11v6h-6"/></svg>Perdas</a>
@@ -37,7 +38,7 @@
       <h1 id="title">Gestão do Corpo Clínico</h1>
       <div class="sub" id="sub">Carregando…</div>
     </div>
-    <div class="filters">
+    <div class="filters" id="topFiltros">
       <label>De</label><select id="fDe"></select>
       <label>Até</label><select id="fAte"></select>
       <label>Área</label><select id="fEsp"></select>
@@ -284,6 +285,38 @@
     </div>
   </section>
 
+  <!-- REPASSE -->
+  <section class="section" id="s-repasse">
+    <div id="rpAviso"></div>
+    <div class="card" style="padding:12px 14px">
+      <div class="filters rp-filtros">
+        <div class="seg" id="rpModo" role="group" aria-label="Visualização"><button data-v="comparar">Comparar dois meses</button><button data-v="meses">Mês a mês</button></div>
+        <span class="rp-cmp"><select id="rpA" aria-label="Mês de comparação"></select><span style="color:var(--muted)">×</span><select id="rpB" aria-label="Mês analisado"></select></span>
+        <span class="rp-ver"><label for="rpVer">Mostrar</label><select id="rpVer"><option value="p">Pago</option><option value="r">Recebido</option><option value="res">Resultado</option><option value="s">Sessões</option><option value="h">Horas</option></select></span>
+        <select id="rpEsp" aria-label="Área"></select>
+        <select id="rpTipo" aria-label="Forma de pagamento"><option value="">Todas as formas</option><option value="fixo">Fixo mensal</option><option value="hora">Por hora</option><option value="sessao">Por sessão</option><option value="percentual">% do recebido</option><option value="sem">Sem tabela</option></select>
+        <select id="rpUni" aria-label="Unidade"></select>
+        <input type="search" id="rpBusca" placeholder="Buscar terapeuta…">
+        <button id="rpCsv">⬇ CSV</button>
+      </div>
+    </div>
+    <div class="kpis" id="rpKpis"></div>
+    <div class="card">
+      <div class="card-head"><div><h2>Pago e recebido mês a mês</h2><div class="hint" id="rpSerieHint"></div></div><div class="legend" id="rpLeg"></div></div>
+      <div class="chartbox" style="height:280px"><canvas id="cRepasse"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h2>Por área</h2><div class="hint">Clique numa área para ver só os terapeutas dela; clique de novo para ver todos.</div></div></div>
+      <div class="tablewrap"><table id="rpAreas"></table></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h2>Por terapeuta</h2><div class="hint">Clique no nome para ver o mês a mês e alterar a remuneração.</div></div>
+        <div class="filters"><label for="rpOrd">Ordenar</label><select id="rpOrd"><option value="pB">Maior pagamento</option><option value="dv">Maior aumento</option><option value="dvn">Maior queda</option><option value="res">Menor resultado</option><option value="nome">Nome (A–Z)</option></select></div></div>
+      <div class="tablewrap" style="max-height:640px"><table id="rpProfs"></table></div>
+    </div>
+    <details class="card" id="rpCfg"><summary><h2 style="display:inline">Regras do cálculo</h2> <span class="hint">duração da sessão, valor recebido por convênio, faltas</span></summary><div id="rpCfgBox"></div></details>
+  </section>
+
   <!-- IMPORTAR -->
   <section class="section" id="s-importar">
     <div class="notice"><span>ℹ️</span><div>Baixe o modelo, preencha no Excel e importe aqui. O banco fica em <b>db/clinica.db</b> (SQLite). Cada importação de <b>saídas</b> e de <b>pacientes ativos</b> substitui a anterior; atendimentos e avaliações são somados sem duplicar.</div></div>
@@ -292,7 +325,7 @@
 </div>
 
 <dialog id="dlg"></dialog>
-<script src="info.js?v=18"></script>
-<script src="app.js?v=18"></script>
+<script src="info.js?v=19"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

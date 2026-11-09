@@ -19,6 +19,7 @@ Se o banco não existir localmente, `web/lib/schema.sql` descreve a estrutura.
 - Perdas evitáveis: `EVITAVEIS` em `web/lib/core.php`.
 - Agenda semanal (planilhas AGENDA VILA / FELICITTÁ): leitura, importação e painel em `web/lib/agenda.php` (`AGENDA_MARCAS`, `AGENDA_AREAS`, `AGENDA_PROF_ALIAS`). Cada importação é uma versão por unidade (`agenda_versoes`); a mais recente vira a carteira ativa (vínculos com origem `agenda:<UNIDADE>`).
 - Dados do Hipo Saúde (sistema descontinuado): importação única do cadastro de terapeutas + grade da semana em `web/lib/hipo.php` (`HIPO_ESP`, união de duplicados, conciliação, `lotacao()`). Arquivo extraído em `dados/hipo/hipo-dados.json`.
+- Repasse (pagamento × recebimento por terapeuta): `web/lib/repasse.php` — tabela `remuneracao` com vigência, tipos fixo/hora/sessao/percentual, config `repasse` (duração da sessão, valor padrão, pagar faltas). Valores com `simulado = 1` são de teste.
 - CRUD genérico de todas as tabelas: `crud_tabelas()` em `web/lib/crud.php` (rotas `api/crud/<tabela>`); profissionais têm `salvar_prof()` e `unir_profissionais()`.
 - Conector somente leitura para o Specially Central: `web/integracao.php` (token Bearer).
 

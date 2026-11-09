@@ -131,12 +131,13 @@ function go(){
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('on', s.id === 's-' + section));
   document.querySelectorAll('nav.side a[data-s]').forEach(a => a.classList.toggle('on', a.dataset.s === section));
   $('cfgBtn').classList.toggle('on', section === 'importar');
-  const titles = {visao:'Visão geral do corpo clínico', ranking:'Ranking — melhores e piores', agenda:'Agenda — quem atende mais, novos e saídas', individual:'Painel individual', profissionais:'Equipe', areas:'Áreas / especialidades', perdas:'Perda de pacientes', pacientes:'Pacientes', satisfacao:'Satisfação', cadastros:'Cadastros', importar:'Importar dados', lotacao:'Lotação — capacidade e ocupação da clínica'};
+  $('topFiltros').hidden = section === 'repasse';   // o repasse tem filtros próprios (meses, área, forma de pagamento)
+  const titles = {visao:'Visão geral do corpo clínico', ranking:'Ranking — melhores e piores', agenda:'Agenda — quem atende mais, novos e saídas', individual:'Painel individual', profissionais:'Equipe', areas:'Áreas / especialidades', perdas:'Perda de pacientes', pacientes:'Pacientes', satisfacao:'Satisfação', cadastros:'Cadastros', importar:'Importar dados', lotacao:'Lotação — capacidade e ocupação da clínica', repasse:'Repasse — quanto pagamos e quanto recebemos por terapeuta'};
   $('title').textContent = titles[section];
   if (D) renderSection();
 }
 function renderSection(){
-  ({visao:rVisao, ranking:rRanking, agenda:rAgenda, individual:rIndividual, profissionais:rEquipe, areas:rAreas, perdas:rPerdas, pacientes:rPacientes, satisfacao:rSatisfacao, cadastros:rCadastros, importar:rImportar, lotacao:rLotacao})[section]();
+  ({visao:rVisao, ranking:rRanking, agenda:rAgenda, individual:rIndividual, profissionais:rEquipe, areas:rAreas, perdas:rPerdas, pacientes:rPacientes, satisfacao:rSatisfacao, cadastros:rCadastros, importar:rImportar, lotacao:rLotacao, repasse:rRepasse})[section]();
 }
 
 /* Clique numa área filtra o painel; clicar de novo na mesma área tira o filtro */
@@ -905,6 +906,8 @@ async function openProf(id){
         <div class="card"><h2>Avaliações (${f.avaliacoes.length})</h2>${f.avaliacoes.length ? f.avaliacoes.slice(0,15).map(a => `<div style="padding:6px 0;border-bottom:1px solid var(--grid)"><b>${a.nota}</b>/10 <span style="color:var(--muted)">${dataL(a.data)} · ${esc(a.paciente||'')}</span><div>${esc(a.comentario||'')}</div></div>`).join('') : '<div class="empty">Sem avaliações</div>'}</div>
       </div>
       ${agSlots.length ? `<div class="card"><h2>Agenda semanal</h2><div class="hint">${ag ? `${ag.atendimentos} atendimentos/semana · ${ag.pacientes} pacientes · ${ag.novos} novos · ${ag.perdas} de saída · ocupação ${pctf(ag.ocupacao)}` : 'Agenda mais recente de cada unidade'}</div>${agendaGrid(agSlots)}</div>` : ''}
+      <div class="card"><div class="card-head"><div><h2>Remuneração</h2><div class="hint" style="margin:0">${f.remuneracao.length ? `${f.remuneracao[0].tipo === 'fixo' ? 'Fixo' : 'Variável'} · vale desde ${dataL(f.remuneracao[0].desde)}${f.remuneracao[0].simulado ? ' · <span class="st-warn">simulado</span>' : ''}` : 'Ainda não cadastrada'}</div></div><button id="mRp">Ver mês a mês / alterar</button></div>
+        <div style="font-size:16px;margin-top:4px">${f.remuneracao.length ? `<span class="tag rp-${f.remuneracao[0].tipo}">${RP_TIPO[f.remuneracao[0].tipo]}</span> <b>${rpRegra(f.remuneracao[0])}</b>` : rpRegra(null)}</div></div>
       <div class="card" id="hipoAg"></div>
       ${f.atend_mes.length ? `<div class="card"><h2>Sessões e faltas por mês</h2><div class="chartbox" style="height:220px"><canvas id="cProfAt"></canvas></div></div>` : ''}
     </div>`;
@@ -912,6 +915,7 @@ async function openProf(id){
   hipoAgenda(id);
   $('mClose').onclick = () => dlg.close();
   $('mEdit').onclick = () => editProf(f);
+  $('mRp').onclick = () => rpProf(id);
   $('mInd').onclick = () => { indProf = id; indEsp = ''; dlg.close(); location.hash = 'individual'; go(); };
   dlg.querySelectorAll('.modsel').forEach(sel => sel.onchange = async () => {
     const [mod, gid] = sel.value.split(':');
@@ -954,6 +958,7 @@ async function hipoAgenda(id, semana){
 
 function editProf(f){
   const dlg = $('dlg'); const isNew = !f.id;
+  const rem = (f.remuneracao || [])[0];
   const comps = (f.competencias || []).map(c => ({...c}));
   const compRow = (c,i) => `<div class="comp-row" data-i="${i}"><input value="${esc(c.nome)}" placeholder="Ex.: ABA, Denver, Bobath, PROMPT…" data-f="nome">
     <select data-f="tipo">${['habilidade','abordagem','certificacao','comportamental'].map(t => `<option ${c.tipo===t?'selected':''}>${t}</option>`).join('')}</select>
@@ -983,6 +988,7 @@ function editProf(f){
       <label>Contratação<select name="contratacao">${['', 'CLT', 'PJ', 'Temporário', 'Estágio'].map(o => `<option value="${o}" ${(f.contratacao || '') === o ? 'selected' : ''}>${o || '—'}</option>`).join('')}</select></label>
       <label>Capacidade semanal (horários)<input type="number" name="capacidade_semanal" value="${v('capacidade_semanal')}" placeholder="vazio = calculada pela carga horária"></label>
       <datalist id="dlUnidades"><option value="Matriz"><option value="Vila"></datalist>
+      <div class="full" style="grid-column:1/-1"><div style="font-size:12px;font-weight:600;color:var(--text-2);margin:6px 0">Remuneração ${rem ? `<span style="font-weight:400">— atual: ${RP_TIPO[rem.tipo]}, ${rpRegra(rem)} desde ${dataL(rem.desde)}. Mudou o valor? Altere e escolha a partir de quando vale; o histórico fica guardado.</span>` : '<span style="font-weight:400">— fixo, por hora, por sessão ou percentual. O sistema calcula o pagamento todo mês.</span>'}</div><div id="pRem">${rpFormLinha(rem ? {tipo: rem.tipo, valor: rem.valor} : {tipo:'hora'})}</div></div>
       <label>Foto ${isNew ? '(salve primeiro)' : ''}<input type="file" id="pfoto" accept="image/*" ${isNew?'disabled':''}></label>
       <label class="full">Observações da coordenação<textarea name="observacoes">${v('observacoes')}</textarea></label>
       <div class="full" style="grid-column:1/-1"><div style="font-size:12px;font-weight:600;color:var(--text-2);margin:6px 0">Grupos que conduz</div><div id="grps"></div><button id="addGrp">+ grupo</button></div>
@@ -999,8 +1005,10 @@ function editProf(f){
   $('addGrp').onclick = e => { e.preventDefault(); gsync(); grps.push({nome:'', ativo:1}); gdraw(); };
   $('addComp').onclick = e => { e.preventDefault(); sync(); comps.push({nome:'', tipo:'habilidade', nivel:''}); redraw(); };
   $('mClose').onclick = $('mCancel').onclick = () => dlg.close();
+  const lerRem = rpFormBind($('pRem'));
   $('mSave').onclick = async () => {
     sync(); gsync();
+    const nr = lerRem(), mudouRem = nr.valor != null && (!rem || nr.tipo !== rem.tipo || nr.valor !== +rem.valor);
     const body = {}; $('pform').querySelectorAll('[name]').forEach(i => body[i.name] = i.value === '' ? null : (['especialidade_id','ativo','meta_pacientes','capacidade_semanal'].includes(i.name) ? +i.value : i.name === 'carga_horaria_semanal' ? +i.value : i.value));
     if (!body.nome) return toast('Informe o nome');
     body.grupos = grps.filter(g => (g.nome || '').trim()).map(g => ({id:g.id || null, nome:g.nome, dia_horario:g.dia_horario || null, capacidade:g.capacidade ? +g.capacidade : null, ativo:+g.ativo}));
@@ -1008,6 +1016,7 @@ function editProf(f){
     const r = await api(isNew ? 'api/profissional' : 'api/profissional/' + f.id, {method: isNew ? 'POST' : 'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     const file = $('pfoto').files?.[0];
     if (file) await api(`api/profissional/${r.id}/foto`, {method:'POST', headers:{'Content-Type':file.type}, body:file});
+    if (mudouRem) await api('api/remuneracao', {method:'POST', headers:JSONH, body: JSON.stringify({...nr, profissional_id:r.id})});
     toast('Cadastro salvo'); await aposSalvar(); if (section === 'cadastros') rCadastros(); openProf(r.id);
   };
   if (!dlg.open) dlg.showModal();
@@ -1016,11 +1025,11 @@ function editProf(f){
 /* ---------------- CADASTROS (CRUD) ---------------- */
 let CRUD_S = null, CRUD_O = null, cdTab = 'profissionais';
 const cdState = {};
-const CD_TABS = [['profissionais','Profissionais'],['conciliacao','Conciliação Hipo'],['pacientes','Pacientes'],['vinculos','Carteira'],['saidas','Saídas'],
+const CD_TABS = [['profissionais','Profissionais'],['remuneracao','Remuneração'],['conciliacao','Conciliação Hipo'],['pacientes','Pacientes'],['vinculos','Carteira'],['saidas','Saídas'],
   ['atendimentos','Atendimentos'],['avaliacoes','Avaliações'],['grupos','Grupos'],['especialidades','Áreas'],['convenios','Convênios'],['agenda_versoes','Agendas']];
 const JSONH = {'Content-Type':'application/json'};
 async function crudLoad(force){ if (!CRUD_S || !CRUD_O || force) [CRUD_S, CRUD_O] = await Promise.all([api('api/crud/schema'), api('api/crud/opcoes')]); }
-async function aposSalvar(){ PROFS_ALL = null; LT = null; await crudLoad(true); await loadMeta(); await refresh(); }
+async function aposSalvar(){ PROFS_ALL = null; LT = null; RP = null; await crudLoad(true); await loadMeta(); await refresh(); }
 const sitSel = (id, v) => `<select id="${id}"><option value="ativos" ${v==='ativos'?'selected':''}>Ativos</option><option value="inativos" ${v==='inativos'?'selected':''}>Inativos</option><option value="" ${!v?'selected':''}>Todos</option></select>`;
 
 async function rCadastros(){
@@ -1281,6 +1290,215 @@ function csvLotacao(){
   a.download = 'lotacao.csv'; a.click();
 }
 
+/* ---------------- REPASSE: quanto pagamos e quanto recebemos por terapeuta, mês a mês ---------------- */
+let RP = null, rpModo = (() => { try { return localStorage.getItem('rpModo') || 'comparar'; } catch { return 'comparar'; } })();
+const RP_TIPO = {fixo:'Fixo mensal', hora:'Por hora', sessao:'Por sessão', percentual:'% do recebido'};
+const brl = n => n == null ? '—' : Number(n).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+const rpRegra = r => !r ? '<span style="color:var(--muted)">sem tabela</span>' : r.tipo === 'percentual' ? fmt(r.valor) + '% do recebido' : brl(r.valor) + ({fixo:' /mês', hora:' /hora', sessao:' /sessão'})[r.tipo];
+const rpMesL = m => mesL(m) + (RP && m === RP.hoje ? ' (parcial)' : '');
+/* variação de b em relação a a; cor só quando subir é claramente bom (bom=1) ou ruim (bom=-1) */
+function rpVar(b, a, bom = 0){
+  if (a == null || b == null || (!a && !b)) return '<span style="color:var(--muted)">—</span>';
+  if (!a) return '<span class="st-warn">novo</span>';
+  const p = 100 * (b - a) / Math.abs(a), cls = Math.abs(p) < 0.5 ? '' : (p > 0) === (bom > 0) && bom ? 'st-good' : bom ? 'st-bad' : '';
+  return `<span class="${cls}" title="${brl(b - a)}">${p > 0.05 ? '▲' : p < -0.05 ? '▼' : ''} ${fmt(Math.abs(p))}%</span>`;
+}
+function rpFiltrados(){
+  const q = norm($('rpBusca').value), e = $('rpEsp').value, t = $('rpTipo').value, u = $('rpUni').value;
+  return RP.profissionais.filter(p => (!e || String(p.esp_id) === e) && (!u || (p.unidade || '') === u)
+    && (!t || (t === 'sem' ? !p.regra : p.regra?.tipo === t)) && (!q || norm(p.nome).includes(q)));
+}
+/* soma de um grupo de terapeutas num mês: pago, recebido, sessões, horas, quantos foram pagos */
+function rpSoma(l, mes){
+  const o = {p:0, r:0, s:0, h:0, n:0, semTabela:0};
+  l.forEach(x => { const m = x.m[mes]; if (!m) return; o.p += m.p || 0; o.r += m.r; o.s += m.s; o.h += m.h; if (m.p) o.n++; if (m.p == null && m.s) o.semTabela++; });
+  o.res = o.r - o.p; return o;
+}
+const rpMetrica = (o, k) => k === 'res' ? o.r - (o.p || 0) : o?.[k] ?? 0;
+const rpFmtMet = (v, k) => ['s', 'h'].includes(k) ? fmt(v) : money(v);
+
+async function rRepasse(){
+  if (!RP) RP = await api('api/repasse');
+  const R = RP, ms = R.meses;
+  /* meses: por padrão o último mês fechado contra o anterior */
+  const fechados = ms.filter(m => m < R.hoje), b0 = fechados.at(-1) || ms.at(-1), a0 = ms[ms.indexOf(b0) - 1] || b0;
+  const opt = (sel, v) => ms.map(m => `<option value="${m}" ${m === v ? 'selected' : ''}>${rpMesL(m)}</option>`).join('');
+  const A = $('rpA').value || a0, B = $('rpB').value || b0;
+  $('rpA').innerHTML = opt('a', A); $('rpB').innerHTML = opt('b', B);
+  const esps = [...new Map(R.profissionais.map(p => [p.esp_id, p.esp])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  const ev = $('rpEsp').value, uv = $('rpUni').value;
+  $('rpEsp').innerHTML = '<option value="">Todas as áreas</option>' + esps.map(([id, n]) => `<option value="${id}" ${String(id) === ev ? 'selected' : ''}>${esc(n)}</option>`).join('');
+  const unis = [...new Set(R.profissionais.map(p => p.unidade).filter(Boolean))].sort();
+  $('rpUni').innerHTML = '<option value="">Todas as unidades</option>' + unis.map(u => `<option ${u === uv ? 'selected' : ''}>${esc(u)}</option>`).join('');
+  $('rpModo').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === rpModo));
+  document.querySelector('#s-repasse .rp-cmp').hidden = rpModo !== 'comparar';
+  document.querySelector('#s-repasse .rp-ver').hidden = rpModo !== 'meses';
+  $('rpOrd').parentElement.hidden = rpModo !== 'comparar';
+
+  const av = [];
+  if (R.simulados) av.push(`<div class="notice warn"><span>🧪</span><div><b>Valores simulados.</b> ${fmt(R.simulados)} linhas da tabela de remuneração${R.conv_simulados ? ` e o valor da sessão de ${R.conv_simulados} convênios` : ''} são de teste, só para ver as telas funcionando. Quando a tabela real chegar, ela substitui tudo isso. <button id="rpLimpa">Apagar dados simulados</button></div></div>`);
+  else if (!R.profissionais.some(p => p.regra)) av.push(`<div class="notice"><span>💰</span><div>Nenhum terapeuta tem remuneração cadastrada. Cadastre na ficha de cada um (<b>Editar cadastro → Remuneração</b>) ou em <a href="#cadastros">Cadastros</a>. <button id="rpSimula">Gerar dados simulados para testar</button></div></div>`);
+  if (R.sem_tabela_ativos) av.push(`<div class="notice"><span>⚠️</span><div><b>${R.sem_tabela_ativos} terapeutas ativos sem remuneração cadastrada</b> — eles aparecem com pagamento “—” e ficam fora do total pago. Filtre por <b>Sem tabela</b> para ver quem são.</div></div>`);
+  if (R.sessoes_sem_valor) av.push(`<div class="notice"><span>ℹ️</span><div>${fmt(R.sessoes_sem_valor)} sessões no período não têm valor recebido (convênio sem valor por sessão). Preencha em <b>Regras do cálculo</b>, no fim da página.</div></div>`);
+  $('rpAviso').innerHTML = av.join('');
+  $('rpLimpa') && ($('rpLimpa').onclick = async () => {
+    if (!confirm('Apagar todos os valores simulados (remuneração e valor por sessão dos convênios)? O que foi digitado à mão fica.')) return;
+    const r = await api('api/repasse/limpar-simulados', {method:'POST', headers:JSONH, body:'{}'}); toast(`${r.apagados} linhas simuladas apagadas`); RP = null; rRepasse();
+  });
+  $('rpSimula') && ($('rpSimula').onclick = async () => {
+    const r = await api('api/repasse/simular', {method:'POST', headers:JSONH, body:'{}'}); toast(`${r.criados} terapeutas com remuneração simulada`); RP = null; rRepasse();
+  });
+
+  const l = rpFiltrados(), sA = rpSoma(l, A), sB = rpSoma(l, B);
+  const pct = (x, y) => y ? 100 * x / y : null;
+  $('rpKpis').innerHTML = rpModo === 'comparar' ?
+    kpi('money', `Pago em ${rpMesL(B)}`, money(sB.p), `${rpVar(sB.p, sA.p)} vs ${mesL(A)} (${money(sA.p)})`) +
+    kpi('money', `Recebido em ${rpMesL(B)}`, money(sB.r), `${rpVar(sB.r, sA.r, 1)} vs ${mesL(A)} (${money(sA.r)})`) +
+    kpi('pct', 'Resultado (recebido − pago)', `<span class="${sB.res < 0 ? 'st-bad' : ''}">${money(sB.res)}</span>`, `${rpVar(sB.res, sA.res, 1)} vs ${mesL(A)} · margem ${pctf(pct(sB.res, sB.r))}`) +
+    kpi('pct', 'Repasse sobre o recebido', pctf(pct(sB.p, sB.r)), `${mesL(A)}: ${pctf(pct(sA.p, sA.r))}`) +
+    kpi('cal', 'Custo por sessão', sB.s ? brl(sB.p / sB.s) : '—', `${fmt(sB.s)} sessões · ${fmt(sB.h)} h · ${mesL(A)}: ${sA.s ? brl(sA.p / sA.s) : '—'}`) +
+    kpi('users', 'Terapeutas pagos', fmt(sB.n), sB.semTabela ? `<span class="st-warn">${sB.semTabela} atenderam sem tabela</span>` : `${fmt(l.length)} no filtro`)
+    : (() => { const tot = ms.map(m => rpSoma(l, m)), soma = k => tot.reduce((s, o) => s + rpMetrica(o, k), 0);
+        return kpi('money', 'Pago no período', money(soma('p')), `${ms.length} meses · média ${money(soma('p') / ms.length)}/mês`) +
+          kpi('money', 'Recebido no período', money(soma('r')), `média ${money(soma('r') / ms.length)}/mês`) +
+          kpi('pct', 'Resultado no período', money(soma('res')), `margem ${pctf(pct(soma('res'), soma('r')))}`) +
+          kpi('pct', 'Repasse sobre o recebido', pctf(pct(soma('p'), soma('r'))), 'no período todo') +
+          kpi('cal', 'Custo por sessão', soma('s') ? brl(soma('p') / soma('s')) : '—', `${fmt(soma('s'))} sessões`); })();
+
+  /* gráfico: barras de pago e recebido, linha do resultado */
+  const tot = ms.map(m => rpSoma(l, m)), o = baseOpts(false);
+  o.plugins.tooltip.mode = 'index'; o.plugins.tooltip.callbacks = {label: i => `${i.dataset.label}: ${money(i.raw)}`};
+  o.scales.y.ticks = {...(o.scales.y.ticks || {}), callback: v => money(v)};
+  draw('cRepasse', {type:'bar', data:{labels: ms.map(m => mesL(m) + (m === R.hoje ? '*' : '')), datasets:[
+    {...bar(tot.map(x => x.p), css('--s2'), 'Pago'), order:2},
+    {...bar(tot.map(x => x.r), css('--s1'), 'Recebido'), order:3},
+    {type:'line', label:'Resultado', data: tot.map(x => x.res), borderColor: css('--s3'), backgroundColor: css('--s3'), pointRadius:3, tension:.25, order:1}]}, options:o});
+  $('rpLeg').innerHTML = [['--s2', 'Pago'], ['--s1', 'Recebido'], ['--s3', 'Resultado']].map(([c, n]) => `<span><span class="sw" style="background:${css(c)}"></span>${n}</span>`).join('');
+  $('rpSerieHint').innerHTML = (ms.includes(R.hoje) ? `* ${mesL(R.hoje)} ainda está em andamento. ` : '') + `Resultado = recebido pelas sessões − pago aos terapeutas (não inclui outros custos da clínica).`;
+
+  /* por área */
+  const areas = esps.map(([id, nome]) => ({id, nome, l: RP.profissionais.filter(p => p.esp_id === id && rpFiltrados().includes(p))})).filter(a => a.l.length);
+  const eSel = $('rpEsp').value;
+  if (rpModo === 'comparar') {
+    const linhaA = (nome, ls, extra = '') => { const a = rpSoma(ls, A), b = rpSoma(ls, B);
+      return `<td class="num">${fmt(b.n)}</td><td class="num">${money(a.p)}</td><td class="num"><b>${money(b.p)}</b></td><td class="num">${rpVar(b.p, a.p)}</td><td class="num">${money(b.r)}</td><td class="num">${rpVar(b.r, a.r, 1)}</td><td class="num ${b.res < 0 ? 'st-bad' : ''}">${money(b.res)}</td><td class="num">${pctf(pct(b.p, b.r))}</td><td class="num">${b.s ? brl(b.p / b.s) : '—'}</td>`; };
+    $('rpAreas').innerHTML = `<thead><tr><th>Área</th><th class="num">Pagos</th><th class="num">Pago ${mesL(A)}</th><th class="num">Pago ${mesL(B)}</th><th class="num">Variação</th><th class="num">Recebido ${mesL(B)}</th><th class="num">Variação</th><th class="num">Resultado</th><th class="num">% repasse</th><th class="num">Custo/sessão</th></tr></thead><tbody>` +
+      areas.map(a => `<tr class="click ${eSel === String(a.id) ? 'sel' : ''}" data-e="${a.id}" ${AREA_TIP}><td><span class="tag"><span class="sw" style="background:${espColor(a.id)}"></span>${esc(a.nome)}</span></td>${linhaA(a.nome, a.l)}</tr>`).join('') +
+      `<tr style="font-weight:650"><td>Total</td>${linhaA('Total', l)}</tr></tbody>`;
+  } else {
+    const k = $('rpVer').value;
+    $('rpAreas').innerHTML = `<thead><tr><th>Área</th>${ms.map(m => `<th class="num">${mesL(m)}${m === R.hoje ? '*' : ''}</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>` +
+      [...areas.map(a => ({...a, tag:true})), {nome:'Total', l}].map(a => { const v = ms.map(m => rpMetrica(rpSoma(a.l, m), k));
+        return `<tr ${a.tag ? `class="click ${eSel === String(a.id) ? 'sel' : ''}" data-e="${a.id}" ${AREA_TIP}` : 'style="font-weight:650"'}><td>${a.tag ? `<span class="tag"><span class="sw" style="background:${espColor(a.id)}"></span>${esc(a.nome)}</span>` : 'Total'}</td>${v.map((x, i) => `<td class="num" title="${i ? 'vs mês anterior: ' + (v[i - 1] ? fmt(100 * (x - v[i - 1]) / Math.abs(v[i - 1])) + '%' : '—') : ''}">${x ? rpFmtMet(x, k) : '<span style="color:var(--muted)">—</span>'}</td>`).join('')}<td class="num"><b>${rpFmtMet(v.reduce((s, x) => s + x, 0), k)}</b></td></tr>`; }).join('') + '</tbody>';
+  }
+  $('rpAreas').querySelectorAll('tr[data-e]').forEach(tr => tr.onclick = () => {
+    const sai = $('rpEsp').value === tr.dataset.e; $('rpEsp').value = sai ? '' : tr.dataset.e; rRepasse();
+    toast(sai ? 'Filtro de área removido' : 'Filtrando pela área — clique de novo para tirar', 2200);
+  });
+  rpProfsTabela(l, A, B);
+}
+function rpProfsTabela(l, A, B){
+  const R = RP, ms = R.meses;
+  if (rpModo === 'comparar') {
+    const ord = $('rpOrd').value, val = (p, m) => p.m[m]?.p ?? 0, dv = p => val(p, B) - val(p, A);
+    const ls = [...l].filter(p => p.m[A] || p.m[B] || p.ativo).sort(ord === 'nome' ? (a, b) => a.nome.localeCompare(b.nome)
+      : ord === 'dv' ? (a, b) => dv(b) - dv(a) : ord === 'dvn' ? (a, b) => dv(a) - dv(b)
+      : ord === 'res' ? (a, b) => ((a.m[B]?.r ?? 0) - val(a, B)) - ((b.m[B]?.r ?? 0) - val(b, B)) : (a, b) => val(b, B) - val(a, B));
+    $('rpProfs').innerHTML = `<thead><tr><th>Terapeuta</th><th>Forma de pagamento</th><th class="num">Sessões ${mesL(A)}</th><th class="num">Sessões ${mesL(B)}</th><th class="num">Horas ${mesL(B)}</th><th class="num">Pago ${mesL(A)}</th><th class="num">Pago ${mesL(B)}</th><th class="num">Variação</th><th class="num">Recebido ${mesL(B)}</th><th class="num">Resultado</th></tr></thead><tbody>` +
+      (ls.map(p => { const a = p.m[A], b = p.m[B], res = b ? b.r - (b.p || 0) : null;
+        return `<tr><td><a href="#" data-rp="${p.id}" style="color:inherit;text-decoration:none">${who(p)}</a>${p.ativo ? '' : ' <span class="tag">inativo</span>'}</td>
+          <td>${p.regra ? `<span class="tag rp-${p.regra.tipo}">${RP_TIPO[p.regra.tipo]}</span> ${rpRegra(p.regra).replace(/ \/(mês|hora|sessão)$/, '<span style="color:var(--muted)">/$1</span>')}` : rpRegra(null)}</td>
+          <td class="num">${fmt(a?.s ?? 0)}</td><td class="num">${fmt(b?.s ?? 0)}</td><td class="num">${fmt(b?.h ?? 0)}</td>
+          <td class="num">${money(a?.p)}</td><td class="num"><b>${money(b?.p)}</b></td><td class="num">${rpVar(b?.p, a?.p)}</td>
+          <td class="num">${money(b?.r ?? 0)}</td><td class="num ${res < 0 ? 'st-bad' : ''}">${res == null ? '—' : money(res)}</td></tr>`; }).join('')
+       || '<tr><td colspan="10" class="empty">Nenhum terapeuta com esses filtros.</td></tr>') + '</tbody>';
+  } else {
+    const k = $('rpVer').value;
+    $('rpProfs').innerHTML = `<thead><tr><th>Terapeuta</th><th>Forma</th>${ms.map(m => `<th class="num">${mesL(m)}${m === R.hoje ? '*' : ''}</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>` +
+      ([...l].sort((a, b) => a.nome.localeCompare(b.nome)).map(p => { const v = ms.map(m => p.m[m] ? rpMetrica(p.m[m], k) : 0);
+        return `<tr><td><a href="#" data-rp="${p.id}" style="color:inherit;text-decoration:none">${who(p)}</a></td><td>${p.regra ? `<span class="tag rp-${p.regra.tipo}">${RP_TIPO[p.regra.tipo]}</span>` : rpRegra(null)}</td>
+          ${v.map((x, i) => `<td class="num">${x ? rpFmtMet(x, k) : '<span style="color:var(--muted)">—</span>'}</td>`).join('')}<td class="num"><b>${rpFmtMet(v.reduce((s, x) => s + x, 0), k)}</b></td></tr>`; }).join('')
+       || `<tr><td colspan="${ms.length + 3}" class="empty">Nenhum terapeuta com esses filtros.</td></tr>`) + '</tbody>';
+  }
+  $('rpProfs').querySelectorAll('[data-rp]').forEach(a => a.onclick = e => { e.preventDefault(); rpProf(+a.dataset.rp); });
+}
+function rpCfg(){
+  const c = RP.config;
+  $('rpCfgBox').innerHTML = `<div class="form-grid" style="margin-top:12px">
+      <label>Duração da sessão (minutos)<input type="number" id="rcMin" min="10" max="240" value="${c.sessao_min}"><span class="hint" style="margin:0">Usada para converter sessões em horas de quem recebe por hora.</span></label>
+      <label>Valor recebido por sessão, quando o convênio não tem valor<input type="number" id="rcPad" step="0.01" min="0" value="${c.valor_padrao ?? ''}" placeholder="sem valor"></label>
+      <label class="chk"><input type="checkbox" id="rcFal" ${c.pagar_faltas ? 'checked' : ''}> Pagar falta sem justificativa (conta como sessão para quem recebe por hora ou por sessão)</label>
+    </div>
+    <h3 style="margin:16px 0 6px;font-size:14px">Valor recebido por sessão em cada convênio</h3>
+    <div class="tablewrap" style="max-height:360px"><table><thead><tr><th>Convênio</th><th class="num">Valor por sessão (R$)</th></tr></thead><tbody>${RP.convenios.map(v => `<tr><td>${esc(v.nome)}</td><td class="num"><input type="number" class="mini-in" step="0.01" min="0" data-c="${v.id}" value="${v.valor_sessao ?? ''}" placeholder="—" aria-label="Valor por sessão de ${esc(v.nome)}"></td></tr>`).join('')}</tbody></table></div>
+    <div class="hint">O valor lançado no próprio atendimento (quando houver) vale mais que o do convênio.</div>`;
+  const salva = async b => { await api('api/repasse/config', {method:'PUT', headers:JSONH, body: JSON.stringify(b)}); toast('Salvo — repasse recalculado'); RP = null; await rRepasse(); };
+  $('rcMin').onchange = () => salva({sessao_min: +$('rcMin').value});
+  $('rcPad').onchange = () => salva({valor_padrao: $('rcPad').value === '' ? null : +$('rcPad').value});
+  $('rcFal').onchange = () => salva({pagar_faltas: $('rcFal').checked});
+  $('rpCfgBox').querySelectorAll('[data-c]').forEach(i => i.onchange = async () => {
+    await api('api/convenio/' + i.dataset.c, {method:'PUT', headers:JSONH, body: JSON.stringify({valor_sessao: i.value === '' ? null : +i.value})});
+    toast('Valor do convênio salvo'); RP = null; await rRepasse();
+  });
+}
+function csvRepasse(){
+  if (!RP) return;
+  const l = rpFiltrados(), ms = RP.meses, q = v => `"${String(v ?? '').replace(/"/g, '""')}"`, n = v => v == null ? '' : String(Math.round(v * 100) / 100).replace('.', ',');
+  const linhas = [['Terapeuta', 'Área', 'Unidade', 'Forma de pagamento', 'Valor da tabela', ...ms.flatMap(m => [`Sessões ${m}`, `Horas ${m}`, `Pago ${m}`, `Recebido ${m}`])],
+    ...l.map(p => [p.nome, p.esp, p.unidade, p.regra ? RP_TIPO[p.regra.tipo] : 'sem tabela', p.regra ? n(p.regra.valor) : '', ...ms.flatMap(m => { const x = p.m[m]; return x ? [x.s, n(x.h), n(x.p), n(x.r)] : ['', '', '', '']; })])];
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + linhas.map(r => r.map(q).join(';')).join('\n')], {type:'text/csv'}));
+  a.download = 'repasse.csv'; a.click();
+}
+
+/* Remuneração de um terapeuta: tabela vigente, histórico de valores e mês a mês */
+const rpFormLinha = (x = {}) => `<div class="form-grid rp-form">
+    <label>Forma de pagamento<select data-r="tipo">${Object.entries(RP_TIPO).map(([k, v]) => `<option value="${k}" ${x.tipo === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+    <label><span data-r="rot">${({fixo:'Valor mensal (R$)', hora:'Valor da hora (R$)', sessao:'Valor por sessão (R$)', percentual:'Percentual do recebido (%)'})[x.tipo || 'fixo']}</span><input type="number" step="0.01" min="0" data-r="valor" value="${x.valor ?? ''}"></label>
+    <label>Vale a partir de<input type="date" data-r="desde" value="${x.desde || new Date().toISOString().slice(0, 8) + '01'}"></label>
+    <label>Observação<input data-r="obs" value="${esc(x.obs && !/^simulado/.test(x.obs) ? x.obs : '')}" placeholder="Ex.: reajuste anual"></label></div>`;
+function rpFormBind(box){
+  const t = box.querySelector('[data-r=tipo]');
+  t.onchange = () => box.querySelector('[data-r=rot]').textContent = ({fixo:'Valor mensal (R$)', hora:'Valor da hora (R$)', sessao:'Valor por sessão (R$)', percentual:'Percentual do recebido (%)'})[t.value];
+  return () => Object.fromEntries([...box.querySelectorAll('[data-r]')].filter(i => i.tagName !== 'SPAN').map(i => [i.dataset.r, i.dataset.r === 'valor' ? (i.value === '' ? null : +i.value) : i.value]));
+}
+async function rpProf(id){
+  const r = await api(`api/repasse/prof/${id}`), p = r.profissionais[0], h = r.historico, dlg = $('dlg');
+  const nome = p?.nome || (await api('api/profissional/' + id)).nome;
+  const ms = r.meses.filter(m => p?.m[m]).reverse();
+  dlg.innerHTML = `<div class="mhead"><h2 style="flex:1">Remuneração — ${esc(nome)}</h2><button id="rpFicha">Ficha</button><button class="ghost" id="mClose">✕</button></div>
+    <div class="mbody">
+      <div class="card"><h2>Forma de pagamento atual</h2><div style="font-size:18px;margin:6px 0 2px">${p?.regra ? `<span class="tag rp-${p.regra.tipo}">${RP_TIPO[p.regra.tipo]}</span> <b>${rpRegra(p.regra)}</b> <span class="hint">desde ${dataL(p.regra.desde)}${p.regra.simulado ? ' · <span class="st-warn">simulado</span>' : ''}</span>` : rpRegra(null)}</div>
+        <h3 style="margin:14px 0 4px;font-size:14px">${p?.regra ? 'Novo valor ou reajuste' : 'Cadastrar remuneração'}</h3>
+        <div class="hint" style="margin:0 0 6px">Um valor novo vale a partir da data escolhida; os meses anteriores continuam calculados com o valor antigo.</div>
+        <div id="rpNovo">${rpFormLinha({tipo: p?.regra?.tipo || 'hora'})}</div><div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="primary" id="rpSalvar">Salvar valor</button></div>
+        ${h.length ? `<h3 style="margin:14px 0 6px;font-size:14px">Histórico de valores</h3><div class="tablewrap"><table><thead><tr><th>Vale a partir de</th><th>Forma</th><th class="num">Valor</th><th>Observação</th><th></th></tr></thead><tbody>${h.map(x => `<tr><td>${dataL(x.desde)}</td><td>${RP_TIPO[x.tipo]}</td><td class="num">${rpRegra(x)}</td><td>${esc(x.obs || '')}${x.simulado ? ' <span class="st-warn">simulado</span>' : ''}</td><td style="text-align:right"><button class="ghost" data-del="${x.id}" title="Excluir esta linha">✕</button></td></tr>`).join('')}</tbody></table></div>` : ''}
+      </div>
+      <div class="card"><h2>Mês a mês</h2><div class="hint">Pago pela regra vigente em cada mês · recebido pelas sessões realizadas</div>
+        ${ms.length ? `<div class="chartbox" style="height:220px"><canvas id="cRpProf"></canvas></div>
+        <div class="tablewrap" style="max-height:340px;margin-top:10px"><table><thead><tr><th>Mês</th><th>Forma</th><th class="num">Sessões</th><th class="num">Faltas</th><th class="num">Horas</th><th class="num">Pago</th><th class="num">vs mês anterior</th><th class="num">Recebido</th><th class="num">Resultado</th></tr></thead><tbody>${ms.map((m, i) => { const x = p.m[m], ant = p.m[ms[i + 1]];
+          return `<tr><td style="white-space:nowrap">${rpMesL(m)}</td><td style="white-space:nowrap">${x.t ? RP_TIPO[x.t] : '—'}</td><td class="num">${fmt(x.s)}</td><td class="num">${fmt(x.f)}</td><td class="num">${fmt(x.h)}</td><td class="num"><b>${money(x.p)}</b></td><td class="num">${ant ? rpVar(x.p, ant.p) : '—'}</td><td class="num">${money(x.r)}</td><td class="num ${x.r - (x.p || 0) < 0 ? 'st-bad' : ''}">${money(x.r - (x.p || 0))}</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">Sem sessões nem pagamentos registrados.</div>'}
+      </div></div>`;
+  if (!dlg.open) dlg.showModal();
+  $('mClose').onclick = () => dlg.close();
+  $('rpFicha').onclick = () => openProf(id);
+  const ler = rpFormBind($('rpNovo'));
+  $('rpSalvar').onclick = async () => {
+    const b = ler(); if (b.valor == null) return toast('Informe o valor');
+    await api('api/remuneracao', {method:'POST', headers:JSONH, body: JSON.stringify({...b, profissional_id:id})});
+    toast('Remuneração salva'); RP = null; rpProf(id);
+  };
+  dlg.querySelectorAll('[data-del]').forEach(bt => bt.onclick = async () => {
+    if (!confirm('Excluir esta linha da tabela de remuneração?')) return;
+    await api('api/crud/remuneracao/' + bt.dataset.del, {method:'DELETE', headers:JSONH}); toast('Linha excluída'); RP = null; rpProf(id);
+  });
+  if (ms.length) {
+    const asc = [...ms].reverse(), o = baseOpts(false);
+    o.plugins.tooltip.mode = 'index'; o.plugins.tooltip.callbacks = {label: i => `${i.dataset.label}: ${money(i.raw)}`};
+    draw('cRpProf', {type:'bar', data:{labels: asc.map(mesL), datasets:[{...bar(asc.map(m => p.m[m].p || 0), css('--s2'), 'Pago')}, {...bar(asc.map(m => p.m[m].r), css('--s1'), 'Recebido')}]}, options:o});
+  }
+}
+
 /* ---------------- IMPORTAR ---------------- */
 const IMPS = [
   {t:'saidas', n:'Saídas de pacientes', d:'Planilha "Pacientes que saíram" (mesmo formato atual). Substitui as saídas anteriores.', c:'saidas'},
@@ -1353,6 +1571,10 @@ $('indBusca').oninput = deb(rIndividual);
 $('pcBusca').oninput = deb(rEquipe); $('pcSort').onchange = rEquipe; $('pcMov').onchange = rEquipe; $('pcSit').onchange = rEquipe;
 $('ltUni').onchange = () => { LT_UNI = $('ltUni').value; rLotacao(); };
 $('ltBusca').oninput = deb(rLtProfs); $('ltEsp').onchange = () => { $('ltAreas').querySelectorAll('tr[data-e]').forEach(x => x.classList.toggle('sel', x.dataset.e === $('ltEsp').value)); rLtProfs(); }; $('ltFonte').onchange = rLtProfs; $('ltCsv').onclick = csvLotacao;
+$('rpModo').onclick = e => { const b = e.target.closest('button'); if (!b) return; rpModo = b.dataset.v; try { localStorage.setItem('rpModo', rpModo); } catch (_) {} rRepasse(); };
+['rpA', 'rpB', 'rpEsp', 'rpTipo', 'rpUni', 'rpVer', 'rpOrd'].forEach(id => $(id).onchange = () => rRepasse());
+$('rpBusca').oninput = deb(() => rRepasse()); $('rpCsv').onclick = csvRepasse;
+$('rpCfg').ontoggle = () => $('rpCfg').open && RP && rpCfg();
 $('plBusca').oninput = deb(rPerdas);
 $('sdBusca').oninput = deb(rSaidasTable); $('sdMot').onchange = rSaidasTable; $('sdCsv').onclick = csvSaidas;
 const escuroAgora = () => { const r = document.documentElement; return r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
