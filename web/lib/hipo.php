@@ -723,7 +723,8 @@ function lotacao_horarios(array $f = []): array
     $uni = trim((string) ($f['unidade'] ?? ''));
     $esp = (int) ($f['esp'] ?? 0);
     $profs = [];
-    foreach (rows('SELECT hipo_id, MIN(id) id, especialidade_id, nome FROM profissionais WHERE hipo_id IS NOT NULL GROUP BY hipo_id') as $r) {
+    foreach (rows('SELECT p.hipo_id, MIN(p.id) id, p.especialidade_id, p.nome, e.nome esp FROM profissionais p JOIN especialidades e ON e.id = p.especialidade_id
+                   WHERE p.hipo_id IS NOT NULL GROUP BY p.hipo_id') as $r) {
         $profs[(int) $r['hipo_id']] = $r;
     }
     $semana = !preg_match('/^\d{4}-\d{2}$/', $periodo);
@@ -796,7 +797,8 @@ function lotacao_horarios(array $f = []): array
                 // quem estava livre: na semana, uma vez; no mês, quantas vezes ficou livre nesse dia/horário
                 if (isset($profs[$d['prof']])) {
                     $l = &$c['livres'][$d['prof']];
-                    $l ??= ['id' => (int) $profs[$d['prof']]['id'], 'nome' => $profs[$d['prof']]['nome'], 'livre' => 0, 'vezes' => 0];
+                    $l ??= ['id' => (int) $profs[$d['prof']]['id'], 'nome' => $profs[$d['prof']]['nome'], 'esp' => $profs[$d['prof']]['esp'],
+                            'esp_id' => (int) $profs[$d['prof']]['especialidade_id'], 'livre' => 0, 'vezes' => 0];
                     $l['vezes']++;
                     $l['livre'] += $st === 'o' ? 0 : 1;
                     unset($l);

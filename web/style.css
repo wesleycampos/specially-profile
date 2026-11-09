@@ -332,3 +332,4 @@ label.chk{flex-direction:row;align-items:center;gap:8px}
 .mc.lh[disabled]{cursor:default}
 .lh-livres{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .lh-livres a{text-decoration:none;color:var(--text)}
+.lh-grupo{margin-top:12px}.lh-gt{display:flex;align-items:center;gap:8px;font-size:13px}
