@@ -114,6 +114,39 @@ const INFO = {
   'horarios por paciente': 'Quantos horários por semana cada paciente usa, em média, na área (ocupados ÷ pacientes). Serve para converter horários livres em vagas.',
   'vagas': 'Quantos pacientes a mais cabem: horários livres ÷ horários que cada paciente usa na área.',
   'lotacao maxima': 'Quantos pacientes a clínica (ou a área) comporta com a equipe ativa atual: os de hoje mais as vagas. No total da clínica, como o mesmo paciente faz várias terapias, a conta segue a proporção atual de pacientes por horário.',
+  /* ---------- ocupação por horário (Lotação) ---------- */
+  'ocupacao por horario': 'Quanto de cada horário (8h, 13h, 14h30…) está ocupado em cada dia. Conta: terapeutas com paciente naquele horário ÷ terapeutas na casa naquele horário. "Na casa" = o horário fica dentro do turno que o terapeuta costuma fazer naquele dia da semana; quem bloqueou o horário não entra. Falta conta como ocupado (o horário estava reservado); desmarcação e feriado não. Verde até 75%, laranja até 90%, vermelho acima.',
+  'livres por area': 'Quantos terapeutas de cada área ficaram livres neste horário. Clique numa barra para ver só aquela área na lista; clique de novo para ver todas.',
+  'terapeutas livres': 'Terapeutas que estavam na casa neste horário sem paciente marcado. No mês, mostra quantas vezes isso aconteceu com cada um.',
+  'livre': 'Quantas vezes, no mês, o terapeuta estava na casa neste dia e horário e ficou sem paciente. Exemplo: 3 = ficou livre em 3 segundas às 13h.',
+  'na casa': 'Quantas vezes, no mês, o terapeuta trabalhou neste dia e horário (estava dentro do turno dele e sem bloqueio). Exemplo: 3 = trabalhou em 3 segundas às 13h.',
+  '% livre': 'Livre ÷ na casa. 100% = ficou sem paciente todas as vezes que estava na casa nesse horário: é o melhor horário para encaixar um paciente novo com ele.',
+
+  /* ---------- repasse ---------- */
+  'pago': 'Quanto a clínica pagou aos terapeutas, calculado pela forma de pagamento de cada um no mês: fixo = valor do mês; por hora = horas atendidas × valor da hora; por sessão = sessões × valor; percentual = % do recebido pelas sessões dele. Quem não tem remuneração cadastrada fica de fora.',
+  'recebido': 'Quanto a clínica recebeu pelas sessões realizadas: valor lançado no atendimento; se não houver, o valor por sessão do convênio do paciente; se não houver, o valor padrão (Regras do cálculo).',
+  'resultado (recebido − pago)': 'Recebido pelas sessões menos o pago aos terapeutas. Não inclui aluguel, salários administrativos e outros custos da clínica. A margem é o resultado ÷ recebido.',
+  'resultado': 'Recebido pelas sessões menos o pago ao terapeuta. Não inclui outros custos da clínica. Em vermelho quando é negativo.',
+  'resultado no periodo': 'Soma do resultado (recebido − pago) de todos os meses mostrados.',
+  'pago no periodo': 'Soma do que foi pago aos terapeutas em todos os meses mostrados, com a média por mês.',
+  'recebido no periodo': 'Soma do que a clínica recebeu pelas sessões em todos os meses mostrados.',
+  'repasse sobre o recebido': 'Pago ÷ recebido. Quanto de cada R$ 100 recebidos vai para os terapeutas. Exemplo: 45% = de cada R$ 100, R$ 45 são repassados.',
+  '% repasse': 'Pago ÷ recebido da área. Quanto do que a área gera vai para os terapeutas dela.',
+  'custo por sessao': 'Pago ÷ sessões realizadas. Quanto custa, em média, cada sessão atendida.',
+  'custo/sessao': 'Pago ÷ sessões realizadas na área.',
+  'terapeutas pagos': 'Terapeutas com algum valor a receber no mês. Quem é por hora ou por sessão e não atendeu não entra; quem atendeu sem remuneração cadastrada aparece em aviso.',
+  'pagos': 'Terapeutas da área com algum valor a receber no mês.',
+  'variacao': 'Diferença percentual do segundo mês em relação ao primeiro. ▲ subiu, ▼ caiu. Passe o mouse para ver a diferença em reais.',
+  'forma de pagamento': 'Como o terapeuta recebe hoje: fixo mensal, por hora atendida, por sessão realizada ou percentual do que a clínica recebe pelas sessões dele. O valor vale a partir da data cadastrada; reajustes ficam no histórico.',
+  'forma': 'Como o terapeuta recebe: fixo mensal, por hora, por sessão ou % do recebido.',
+  'horas': 'Sessões realizadas × duração da sessão (45 min, ajustável em Regras do cálculo). É a base de quem recebe por hora.',
+  'pago e recebido mes a mes': 'Barras: quanto foi pago aos terapeutas e quanto a clínica recebeu pelas sessões, em cada mês. Linha: o resultado (recebido − pago). O mês atual está em andamento e aparece com *.',
+  'forma de pagamento atual': 'A regra que vale hoje. Para um reajuste, cadastre um valor novo com a data a partir de quando vale: os meses anteriores continuam calculados com o valor antigo.',
+  'historico de valores': 'Todas as formas e valores que este terapeuta já teve, com a data em que cada um passou a valer.',
+  'remuneracao': 'Como o terapeuta é pago (fixo, por hora, por sessão ou %). O sistema calcula sozinho o pagamento de cada mês; veja a aba Repasse.',
+  'por terapeuta': 'Pagamento e recebimento de cada terapeuta. Clique no nome para ver o mês a mês dele e alterar a remuneração.',
+  'regras do calculo': 'Parâmetros usados no cálculo do repasse: duração da sessão (para converter sessões em horas), valor recebido por sessão em cada convênio e se a falta sem justificativa é paga.',
+
   'origem': 'De onde veio a capacidade: informada (à mão), carga horária (do Hipo ou do cadastro), turno na agenda (estimada) ou sem dados (preencha a carga).',
 };
 
@@ -130,7 +163,8 @@ function addInfoIcons(root = document){
   root.querySelectorAll(INFO_SEL).forEach(el => {
     if (el.querySelector(':scope > .ii')) return;
     const txt = [...el.childNodes].filter(n => n.nodeType === 3 || (n.nodeType === 1 && !n.classList.contains('ii'))).map(n => n.textContent).join('');
-    const tip = INFO_N[infoKey(txt)];
+    const k = infoKey(txt);
+    const tip = INFO_N[k] ?? INFO_N[k.replace(/\s+—.*$/, '').replace(/(\s+em)?\s+[a-z]{3}\/\d{2}(\s*\(parcial\))?\*?$/, '').trim()];
     if (!tip) return;
     const i = document.createElement('span');
     i.className = 'ii'; i.tabIndex = 0; i.setAttribute('role', 'button'); i.setAttribute('aria-label', 'O que é: ' + txt.trim());
