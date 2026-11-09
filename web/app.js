@@ -1372,7 +1372,7 @@ async function rRepasse(){
 
   const av = [];
   if (R.simulados) av.push(`<div class="notice warn"><span>🧪</span><div><b>Valores simulados.</b> ${fmt(R.simulados)} linhas da tabela de remuneração${R.conv_simulados ? ` e o valor da sessão de ${R.conv_simulados} convênios` : ''} são de teste, só para ver as telas funcionando. Quando a tabela real chegar, ela substitui tudo isso. <button id="rpLimpa">Apagar dados simulados</button></div></div>`);
-  else if (!R.profissionais.some(p => p.regra)) av.push(`<div class="notice"><span>💰</span><div>Nenhum terapeuta tem remuneração cadastrada. Cadastre na ficha de cada um (<b>Editar cadastro → Remuneração</b>) ou em <a href="#cadastros">Cadastros</a>. <button id="rpSimula">Gerar dados simulados para testar</button></div></div>`);
+  else if (!R.profissionais.some(p => p.regra)) av.push(`<div class="notice"><span>💰</span><div>Nenhum terapeuta tem remuneração cadastrada. Cadastre na ficha de cada um (<b>Editar cadastro → Remuneração</b>) ou em <a href="#cadastros">Cadastros</a>.${/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? ' <button id="rpSimula">Gerar dados simulados para testar</button>' : ''}</div></div>`);
   if (R.sem_tabela_ativos) av.push(`<div class="notice"><span>⚠️</span><div><b>${R.sem_tabela_ativos} terapeutas ativos sem remuneração cadastrada</b> — eles aparecem com pagamento “—” e ficam fora do total pago. Filtre por <b>Sem tabela</b> para ver quem são.</div></div>`);
   if (R.sessoes_sem_valor) av.push(`<div class="notice"><span>ℹ️</span><div>${fmt(R.sessoes_sem_valor)} sessões no período não têm valor recebido (convênio sem valor por sessão). Preencha em <b>Regras do cálculo</b>, no fim da página.</div></div>`);
   $('rpAviso').innerHTML = av.join('');
