@@ -102,6 +102,9 @@ O Hipo Saúde (https://specially.hiposaudeintegrada.com.br) vai ser descontinuad
 - **Ajuste fino:** na tabela *Capacidade por terapeuta*, preencha a carga horária ou a capacidade de quem está "sem dados". O total recalcula na hora.
 - Parâmetros: `LOT_SESSOES_DIA`, `LOT_HORAS_DIA` e `LOT_DIAS_MAX` em `web/lib/hipo.php`.
 
+### Ocupação por horário (aba Lotação)
+Mapa horário × dia com o % ocupado (`lotacao_horarios()` em `web/lib/hipo.php`, rota `api/lotacao/horarios`). Disponível = terapeuta na casa naquele horário (dentro do turno que ele costuma fazer naquele dia da semana) e sem bloqueio; ocupado = com paciente marcado (falta conta como ocupado; desmarcada e feriado não). Período: a semana da grade do Hipo (clicar no horário mostra quem está livre) ou um mês do histórico. Dias de feriado ficam fora da conta.
+
 ## Repasse (aba Repasse)
 Quanto a clínica paga a cada terapeuta e quanto recebe pelas sessões dele, mês a mês. Código em `web/lib/repasse.php`.
 - **Tabela de remuneração** (`remuneracao`): uma linha por terapeuta e vigência (`desde`). Formas: `fixo` (valor mensal), `hora` (R$ por hora atendida), `sessao` (R$ por sessão realizada) e `percentual` (% do recebido). Reajuste = linha nova; os meses anteriores continuam com o valor antigo. Edita-se na ficha do terapeuta (**Editar cadastro → Remuneração** ou **Ver mês a mês / alterar**) e em **Cadastros → Remuneração**.

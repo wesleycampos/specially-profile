@@ -68,6 +68,9 @@ try {
         if (preg_match('#^hipo/agenda/(\d+)$#', $r, $m)) {
             send(200, hipo_agenda_prof((int) $m[1], $_GET['semana'] ?? null));
         }
+        if ($r === 'lotacao/horarios') {
+            send(200, lotacao_horarios($_GET));
+        }
         if ($r === 'lotacao') {
             send(200, lotacao($_GET));
         }

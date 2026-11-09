@@ -694,3 +694,115 @@ function hipo_agenda_prof(int $pid, ?string $semana = null): array
     return ['tem' => true, 'semana' => $seg->format('Y-m-d'), 'sessoes' => $sessoes, 'meses' => $meses, 'periodo' => $ref,
             'anterior' => $seg->modify('-7 days')->format('Y-m-d'), 'proxima' => $seg->modify('+7 days')->format('Y-m-d')];
 }
+
+// ------------------------------------------------------------------ ocupação por horário
+/**
+ * % ocupado em cada horário da grade (13:00, 13:45…) por dia da semana.
+ * periodo = 'semana' (grade da semana de referência do Hipo) ou 'AAAA-MM' (histórico de sessões daquele mês).
+ * Disponível: o terapeuta estava na casa — o horário fica dentro do turno dele naquele dia da semana (do primeiro ao
+ * último horário que ele costuma ter nesse dia, olhando o período e, na semana, também as 4 semanas anteriores) —
+ * e não estava bloqueado. Ocupado: tinha paciente marcado (faltas contam como ocupado; desmarcadas e feriados não).
+ */
+function lotacao_horarios(array $f = []): array
+{
+    $grade = config_get('hipo_horarios', []);
+    if (!$grade) {
+        return ['horarios' => [], 'celulas' => []];
+    }
+    $ini = array_column($grade, 'hora_inicio');
+    $slot = function (string $t) use ($ini): int {
+        $i = 0;
+        foreach ($ini as $k => $h) {
+            if ($h <= substr($t, 0, 5)) {
+                $i = $k;
+            }
+        }
+        return $i;
+    };
+    $periodo = (string) ($f['periodo'] ?? 'semana');
+    $uni = trim((string) ($f['unidade'] ?? ''));
+    $esp = (int) ($f['esp'] ?? 0);
+    $profs = [];
+    foreach (rows('SELECT hipo_id, MIN(id) id, especialidade_id, nome FROM profissionais WHERE hipo_id IS NOT NULL GROUP BY hipo_id') as $r) {
+        $profs[(int) $r['hipo_id']] = $r;
+    }
+    $semana = !preg_match('/^\d{4}-\d{2}$/', $periodo);
+    $args = [];
+    if ($semana) {
+        $sql = "SELECT data, dia_semana dia, hora_inicio h, hipo_prof prof, CASE tipo WHEN 'bloqueio' THEN 'b' ELSE 'o' END k FROM hipo_grade WHERE 1";
+    } else {
+        $sql = "SELECT data, CAST(strftime('%w', data) AS INTEGER) - 1 dia, hora_inicio h, hipo_prof prof,
+                       CASE WHEN status LIKE 'Cancelad%' OR status LIKE 'Desmarcad%' THEN 'l' ELSE 'o' END k
+                FROM hipo_sessoes WHERE data BETWEEN ? AND ? AND status <> 'Feriado' AND hora_inicio IS NOT NULL";
+        $args = [$periodo . '-01', $periodo . '-31'];
+    }
+    if ($uni !== '') {
+        $sql .= ' AND unidade = ?';
+        $args[] = $uni;
+    }
+    // feriados: a grade do Hipo não traz as sessões de feriado, então o dia parece vazio — fica de fora
+    $feriados = array_column(rows("SELECT data FROM hipo_sessoes GROUP BY data HAVING SUM(status = 'Feriado') * 2 > COUNT(*)"), 'data', 'data');
+    // por terapeuta e data: o que houve em cada horário (bloqueio vence ocupado, ocupado vence livre)
+    $dias = [];
+    foreach (rows($sql, $args) as $r) {
+        $p = (int) $r['prof'];
+        if (isset($feriados[$r['data']]) || $r['dia'] < 0 || $r['dia'] > 5 || ($esp && (int) ($profs[$p]['especialidade_id'] ?? 0) !== $esp)) {
+            continue;
+        }
+        $d = &$dias[$p . '|' . $r['data']];
+        $d ??= ['dia' => (int) $r['dia'], 'prof' => $p, 's' => []];
+        $s = $slot($r['h']);
+        $atual = $d['s'][$s] ?? 'l';
+        $d['s'][$s] = $atual === 'b' || $r['k'] === 'b' ? 'b' : ($atual === 'o' || $r['k'] === 'o' ? 'o' : 'l');
+        unset($d);
+    }
+    // turno de cada terapeuta em cada dia da semana: do primeiro ao último horário que ele costuma ter nesse dia
+    $turno = [];
+    $marca = function (int $p, int $dia, int $s) use (&$turno) {
+        $t = &$turno[$p][$dia];
+        $t = $t ? [min($t[0], $s), max($t[1], $s)] : [$s, $s];
+    };
+    foreach ($dias as $d) {
+        foreach (array_keys($d['s']) as $s) {
+            $marca($d['prof'], $d['dia'], $s);
+        }
+    }
+    if ($semana && ($ref = config_get('hipo_grade')) && !empty($ref['de'])) {
+        $de = (new DateTimeImmutable($ref['de']))->modify('-28 days')->format('Y-m-d');
+        foreach (rows("SELECT hipo_prof prof, CAST(strftime('%w', data) AS INTEGER) - 1 dia, hora_inicio h FROM hipo_sessoes
+                       WHERE data >= ? AND data < ? AND status <> 'Feriado' AND hora_inicio IS NOT NULL" . ($uni !== '' ? ' AND unidade = ?' : ''),
+                      array_merge([$de, $ref['de']], $uni !== '' ? [$uni] : [])) as $r) {
+            if (isset($turno[(int) $r['prof']][(int) $r['dia']])) {   // só alarga o turno de quem trabalha nesse dia na semana
+                $marca((int) $r['prof'], (int) $r['dia'], $slot($r['h']));
+            }
+        }
+    }
+    $cel = [];   // [dia][slot] => disp, oc, bloq, livres (nomes, só na semana)
+    $datas = [];
+    foreach ($dias as $k => $d) {
+        $datas[explode('|', $k)[1]] = true;
+        [$a, $b] = $turno[$d['prof']][$d['dia']];
+        for ($i = $a; $i <= $b; $i++) {
+            $c = &$cel[$d['dia']][$i];
+            $c ??= ['disp' => 0, 'oc' => 0, 'bloq' => 0, 'livres' => []];
+            $st = $d['s'][$i] ?? 'l';
+            if ($st === 'b') {
+                $c['bloq']++;
+            } else {
+                $c['disp']++;
+                if ($st === 'o') {
+                    $c['oc']++;
+                } elseif ($semana && isset($profs[$d['prof']])) {
+                    $c['livres'][] = ['id' => (int) $profs[$d['prof']]['id'], 'nome' => $profs[$d['prof']]['nome']];
+                }
+            }
+            unset($c);
+        }
+    }
+    $meses = rows("SELECT DISTINCT substr(data, 1, 7) m FROM hipo_sessoes ORDER BY 1 DESC");
+    $ref = config_get('hipo_grade');
+    $fer = array_values(array_filter($feriados, fn($d) => $semana ? ($ref && $d >= $ref['de'] && $d <= $ref['ate']) : str_starts_with($d, $periodo)));
+    return ['periodo' => $semana ? 'semana' : $periodo, 'referencia' => $ref, 'feriados' => $fer, 'dias_no_periodo' => count($datas),
+            'horarios' => array_map(fn($g) => ['ini' => $g['hora_inicio'], 'fim' => $g['hora_fim']], $grade),
+            'celulas' => $cel, 'meses' => array_column($meses, 'm')];
+}

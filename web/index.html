@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Specially Profile</title>
 <meta name="robots" content="noindex,nofollow">
-<link rel="stylesheet" href="style.css?v=19">
+<link rel="stylesheet" href="style.css?v=20">
 <script src="vendor/chart.umd.min.js"></script>
 </head>
 <body>
@@ -272,6 +272,11 @@
     <div id="ltAviso"></div>
     <div class="kpis" id="ltKpis"></div>
     <div class="card">
+      <div class="card-head"><div><h2>Ocupação por horário</h2><div class="hint" id="lhHint">Quanto de cada horário está ocupado: terapeutas com paciente ÷ terapeutas na casa naquele horário (sem bloqueio).</div></div>
+        <div class="filters"><select id="lhPer" aria-label="Período"></select><select id="lhEsp" aria-label="Área"></select></div></div>
+      <div id="lhBox"></div>
+    </div>
+    <div class="card">
       <div class="card-head"><div><h2>Lotação por área</h2><div class="hint">Horários de atendimento por semana dos terapeutas ativos, comparados com a grade real da semana no Hipo</div></div>
         <div class="filters"><label>Unidade</label><select id="ltUni"></select></div></div>
       <div class="tablewrap"><table id="ltAreas"></table></div>
@@ -325,7 +330,7 @@
 </div>
 
 <dialog id="dlg"></dialog>
-<script src="info.js?v=19"></script>
-<script src="app.js?v=19"></script>
+<script src="info.js?v=20"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>

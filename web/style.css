@@ -325,3 +325,10 @@ nav.side a{flex:none}
 label.chk{flex-direction:row;align-items:center;gap:8px}
 .notice.warn{border-color:var(--warn)}
 #topFiltros[hidden]{display:none}
+
+/* ocupação por horário (Lotação) */
+.lhmapa td{min-width:78px}
+.mc.lh small{color:inherit;opacity:.75}
+.mc.lh[disabled]{cursor:default}
+.lh-livres{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.lh-livres a{text-decoration:none;color:var(--text)}

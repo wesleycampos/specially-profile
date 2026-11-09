@@ -1254,10 +1254,43 @@ async function rLotacao(){
     rLtProfs();
     if (!sai) $('ltProfs').scrollIntoView({behavior:'smooth', block:'start'});
   });
+  rLtHorarios();
   const esps = [...new Map(L.profissionais.map(p => [p.esp_id, p.esp])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   const ev = $('ltEsp').value;
   $('ltEsp').innerHTML = '<option value="">Todas as áreas</option>' + esps.map(([id, n]) => `<option value="${id}" ${String(id) === ev ? 'selected' : ''}>${esc(n)}</option>`).join('');
   rLtProfs();
+}
+/* Ocupação por horário: % ocupado às 8h, 13h, 14h… em cada dia, na semana do Hipo ou num mês do histórico */
+let LH = null, LH_KEY = '';
+const lhCor = v => v == null ? 'transparent' : `color-mix(in srgb, ${v >= 90 ? 'var(--bad)' : v >= 75 ? 'var(--warn)' : 'var(--good)'} ${Math.round(18 + 0.5 * v)}%, var(--surface))`;
+async function rLtHorarios(){
+  const per = $('lhPer').value || 'semana', esp = $('lhEsp').value, key = [per, esp, LT_UNI].join('|');
+  if (!LH || LH_KEY !== key) { LH = await api(`api/lotacao/horarios?periodo=${per}&esp=${esp}&unidade=${encodeURIComponent(LT_UNI)}`); LH_KEY = key; }
+  const H = LH, ev = esp;
+  $('lhPer').innerHTML = `<option value="semana">Semana atual (grade do Hipo)</option>` + H.meses.map(m => `<option value="${m}" ${m === per ? 'selected' : ''}>${mesL(m)} (histórico)</option>`).join('');
+  $('lhEsp').innerHTML = '<option value="">Todas as áreas</option>' + META.especialidades.map(e => `<option value="${e.id}" ${String(e.id) === ev ? 'selected' : ''}>${esc(e.nome)}</option>`).join('');
+  if (!H.horarios.length) { $('lhBox').innerHTML = '<div class="empty">Importe o arquivo do Hipo para ver a ocupação por horário.</div>'; return; }
+  const dias = [0, 1, 2, 3, 4, 5].filter(d => H.celulas[d]), pc = c => c && c.disp ? Math.round(1000 * c.oc / c.disp) / 10 : null;
+  const soma = cs => cs.reduce((o, c) => c ? {disp: o.disp + c.disp, oc: o.oc + c.oc, bloq: o.bloq + c.bloq} : o, {disp:0, oc:0, bloq:0});
+  const linhas = H.horarios.map((h, i) => ({h, i, cs: dias.map(d => H.celulas[d]?.[i])})).filter(l => l.cs.some(Boolean));
+  const tot = soma(linhas.flatMap(l => l.cs));
+  const cell = (c, d, i) => { const v = pc(c); if (!c) return '<td></td>';
+    return `<td><button class="mc lh" ${H.periodo === 'semana' ? `data-d="${d}" data-i="${i}"` : 'disabled'} style="background:${lhCor(v)}" title="${c.oc} ocupados de ${c.disp} terapeutas na casa${c.bloq ? ` · ${c.bloq} bloqueados` : ''} · ${c.disp - c.oc} livres"><b>${v == null ? '—' : fmt(v) + '%'}</b><small>${c.disp - c.oc} livres</small></button></td>`; };
+  $('lhBox').innerHTML = `<div class="tablewrap" style="max-height:620px"><table class="agmapa lhmapa"><thead><tr><th>Horário</th>${dias.map(d => `<th>${DIAS[d + 1]}</th>`).join('')}<th class="num">${H.periodo === 'semana' ? 'Semana' : 'Mês'}</th></tr></thead><tbody>` +
+    linhas.map(l => { const t = soma(l.cs); return `<tr><td class="num" style="white-space:nowrap"><b>${l.h.ini}</b> <span style="color:var(--muted)">– ${l.h.fim}</span></td>${l.cs.map((c, k) => cell(c, dias[k], l.i)).join('')}<td class="num" style="min-width:150px">${ocBar(pc(t))}<div class="hint" style="margin:0">${fmt(t.oc)} de ${fmt(t.disp)} · ${fmt(t.disp - t.oc)} livres</div></td></tr>`; }).join('') +
+    `<tr style="font-weight:650"><td>Dia todo</td>${dias.map(d => { const t = soma(linhas.map(l => H.celulas[d]?.[l.i])); return `<td class="num">${pctf(pc(t))}</td>`; }).join('')}<td class="num">${ocBar(pc(tot))}</td></tr></tbody></table></div>
+    ${H.feriados?.length ? `<div class="hint" style="margin-top:8px">Feriado fora da conta: ${H.feriados.map(d => dataL(d) + ' (' + DIAS[(new Date(d + 'T12:00').getDay() + 6) % 7 + 1] + ')').join(', ')}.</div>` : ''}
+    <div class="legend" style="margin-top:8px"><span><span class="sw" style="background:${lhCor(60)}"></span>até 75%: tem espaço</span><span><span class="sw" style="background:${lhCor(80)}"></span>75–90%: enchendo</span><span><span class="sw" style="background:${lhCor(95)}"></span>90% ou mais: quase lotado</span>${H.periodo === 'semana' ? '<span>· clique num horário para ver quem está livre</span>' : `<span>· soma dos ${H.dias_no_periodo} dias com atendimento no mês</span>`}</div>`;
+  $('lhBox').querySelectorAll('.mc.lh[data-d]').forEach(b => b.onclick = () => {
+    const d = +b.dataset.d, i = +b.dataset.i, c = H.celulas[d][i], h = H.horarios[i], dlg = $('dlg');
+    const ls = [...c.livres].sort((a, b) => a.nome.localeCompare(b.nome));
+    dlg.innerHTML = `<div class="mhead"><h2 style="flex:1">${DIAS[d + 1]} · ${h.ini}–${h.fim}</h2><span class="hint" style="margin:0">${pctf(pc(c))} ocupado · ${c.oc} com paciente · ${c.disp - c.oc} livres${c.bloq ? ` · ${c.bloq} bloqueados` : ''}</span><button class="ghost" id="mClose" aria-label="Fechar">✕</button></div>
+      <div class="mbody"><div class="card"><h2>Terapeutas livres neste horário</h2><div class="hint">Estão na casa nesse turno e sem paciente marcado na grade do Hipo.</div>
+      ${ls.length ? `<div class="lh-livres">${ls.map(p => `<a href="#" data-p="${p.id}" class="tag">${esc(p.nome)}</a>`).join('')}</div>` : '<div class="empty">Ninguém livre neste horário.</div>'}</div></div>`;
+    $('mClose').onclick = () => dlg.close();
+    dlg.querySelectorAll('[data-p]').forEach(el => el.onclick = e => { e.preventDefault(); dlg.close(); openProf(+el.dataset.p); });
+    if (!dlg.open) dlg.showModal();
+  });
 }
 function ltFiltrados(){
   const q = norm($('ltBusca').value), e = $('ltEsp').value, f = $('ltFonte').value;
@@ -1570,7 +1603,7 @@ $('agSoMarc').onchange = rGrade; $('agVagos').onchange = rGrade; $('agGradeBusca
 $('indBusca').oninput = deb(rIndividual);
 $('pcBusca').oninput = deb(rEquipe); $('pcSort').onchange = rEquipe; $('pcMov').onchange = rEquipe; $('pcSit').onchange = rEquipe;
 $('ltUni').onchange = () => { LT_UNI = $('ltUni').value; rLotacao(); };
-$('ltBusca').oninput = deb(rLtProfs); $('ltEsp').onchange = () => { $('ltAreas').querySelectorAll('tr[data-e]').forEach(x => x.classList.toggle('sel', x.dataset.e === $('ltEsp').value)); rLtProfs(); }; $('ltFonte').onchange = rLtProfs; $('ltCsv').onclick = csvLotacao;
+$('ltBusca').oninput = deb(rLtProfs); $('ltEsp').onchange = () => { $('ltAreas').querySelectorAll('tr[data-e]').forEach(x => x.classList.toggle('sel', x.dataset.e === $('ltEsp').value)); rLtProfs(); }; $('ltFonte').onchange = rLtProfs; $('ltCsv').onclick = csvLotacao; $('lhPer').onchange = $('lhEsp').onchange = rLtHorarios;
 $('rpModo').onclick = e => { const b = e.target.closest('button'); if (!b) return; rpModo = b.dataset.v; try { localStorage.setItem('rpModo', rpModo); } catch (_) {} rRepasse(); };
 ['rpA', 'rpB', 'rpEsp', 'rpTipo', 'rpUni', 'rpVer', 'rpOrd'].forEach(id => $(id).onchange = () => rRepasse());
 $('rpBusca').oninput = deb(() => rRepasse()); $('rpCsv').onclick = csvRepasse;
