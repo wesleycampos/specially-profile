@@ -1267,7 +1267,7 @@ async function rLtHorarios(){
   const per = $('lhPer').value || 'semana', esp = $('lhEsp').value, key = [per, esp, LT_UNI].join('|');
   if (!LH || LH_KEY !== key) { LH = await api(`api/lotacao/horarios?periodo=${per}&esp=${esp}&unidade=${encodeURIComponent(LT_UNI)}`); LH_KEY = key; }
   const H = LH, ev = esp;
-  $('lhPer').innerHTML = `<option value="semana">Semana atual (grade do Hipo)</option>` + H.meses.map(m => `<option value="${m}" ${m === per ? 'selected' : ''}>${mesL(m)} (histórico)</option>`).join('');
+  $('lhPer').innerHTML = `<option value="semana">Semana atual (grade do Hipo)</option>` + H.meses.map(m => `<option value="${m}" ${m === per ? 'selected' : ''}>${mesL(m)} ${H.extraido_em && m >= H.extraido_em.slice(0, 7) ? '(agenda marcada até ' + dataL(H.extraido_em) + ')' : '(histórico)'}</option>`).join('');
   $('lhEsp').innerHTML = '<option value="">Todas as áreas</option>' + META.especialidades.map(e => `<option value="${e.id}" ${String(e.id) === ev ? 'selected' : ''}>${esc(e.nome)}</option>`).join('');
   if (!H.horarios.length) { $('lhBox').innerHTML = '<div class="empty">Importe o arquivo do Hipo para ver a ocupação por horário.</div>'; return; }
   const dias = [0, 1, 2, 3, 4, 5].filter(d => H.celulas[d]), pc = c => c && c.disp ? Math.round(1000 * c.oc / c.disp) / 10 : null;
@@ -1275,18 +1275,20 @@ async function rLtHorarios(){
   const linhas = H.horarios.map((h, i) => ({h, i, cs: dias.map(d => H.celulas[d]?.[i])})).filter(l => l.cs.some(Boolean));
   const tot = soma(linhas.flatMap(l => l.cs));
   const cell = (c, d, i) => { const v = pc(c); if (!c) return '<td></td>';
-    return `<td><button class="mc lh" ${H.periodo === 'semana' ? `data-d="${d}" data-i="${i}"` : 'disabled'} style="background:${lhCor(v)}" title="${c.oc} ocupados de ${c.disp} terapeutas na casa${c.bloq ? ` · ${c.bloq} bloqueados` : ''} · ${c.disp - c.oc} livres"><b>${v == null ? '—' : fmt(v) + '%'}</b><small>${c.disp - c.oc} livres</small></button></td>`; };
+    return `<td><button class="mc lh" data-d="${d}" data-i="${i}" style="background:${lhCor(v)}" title="${c.oc} ocupados de ${c.disp} terapeutas na casa${c.bloq ? ` · ${c.bloq} bloqueados` : ''} · ${c.disp - c.oc} livres"><b>${v == null ? '—' : fmt(v) + '%'}</b><small>${c.disp - c.oc} livres</small></button></td>`; };
   $('lhBox').innerHTML = `<div class="tablewrap" style="max-height:620px"><table class="agmapa lhmapa"><thead><tr><th>Horário</th>${dias.map(d => `<th>${DIAS[d + 1]}</th>`).join('')}<th class="num">${H.periodo === 'semana' ? 'Semana' : 'Mês'}</th></tr></thead><tbody>` +
     linhas.map(l => { const t = soma(l.cs); return `<tr><td class="num" style="white-space:nowrap"><b>${l.h.ini}</b> <span style="color:var(--muted)">– ${l.h.fim}</span></td>${l.cs.map((c, k) => cell(c, dias[k], l.i)).join('')}<td class="num" style="min-width:150px">${ocBar(pc(t))}<div class="hint" style="margin:0">${fmt(t.oc)} de ${fmt(t.disp)} · ${fmt(t.disp - t.oc)} livres</div></td></tr>`; }).join('') +
     `<tr style="font-weight:650"><td>Dia todo</td>${dias.map(d => { const t = soma(linhas.map(l => H.celulas[d]?.[l.i])); return `<td class="num">${pctf(pc(t))}</td>`; }).join('')}<td class="num">${ocBar(pc(tot))}</td></tr></tbody></table></div>
     ${H.feriados?.length ? `<div class="hint" style="margin-top:8px">Feriado fora da conta: ${H.feriados.map(d => dataL(d) + ' (' + DIAS[(new Date(d + 'T12:00').getDay() + 6) % 7 + 1] + ')').join(', ')}.</div>` : ''}
-    <div class="legend" style="margin-top:8px"><span><span class="sw" style="background:${lhCor(60)}"></span>até 75%: tem espaço</span><span><span class="sw" style="background:${lhCor(80)}"></span>75–90%: enchendo</span><span><span class="sw" style="background:${lhCor(95)}"></span>90% ou mais: quase lotado</span>${H.periodo === 'semana' ? '<span>· clique num horário para ver quem está livre</span>' : `<span>· soma dos ${H.dias_no_periodo} dias com atendimento no mês</span>`}</div>`;
+    <div class="legend" style="margin-top:8px"><span><span class="sw" style="background:${lhCor(60)}"></span>até 75%: tem espaço</span><span><span class="sw" style="background:${lhCor(80)}"></span>75–90%: enchendo</span><span><span class="sw" style="background:${lhCor(95)}"></span>90% ou mais: quase lotado</span><span>· clique num horário para ver quem está livre</span>${H.periodo === 'semana' ? '' : `<span>· soma dos ${H.dias_no_periodo} dias com atendimento no mês</span>`}</div>`;
   $('lhBox').querySelectorAll('.mc.lh[data-d]').forEach(b => b.onclick = () => {
     const d = +b.dataset.d, i = +b.dataset.i, c = H.celulas[d][i], h = H.horarios[i], dlg = $('dlg');
-    const ls = [...c.livres].sort((a, b) => a.nome.localeCompare(b.nome));
+    const mes = H.periodo !== 'semana';
+    const ls = [...c.livres].sort((a, b) => mes ? b.livre / b.vezes - a.livre / a.vezes || b.livre - a.livre || a.nome.localeCompare(b.nome) : a.nome.localeCompare(b.nome));
     dlg.innerHTML = `<div class="mhead"><h2 style="flex:1">${DIAS[d + 1]} · ${h.ini}–${h.fim}</h2><span class="hint" style="margin:0">${pctf(pc(c))} ocupado · ${c.oc} com paciente · ${c.disp - c.oc} livres${c.bloq ? ` · ${c.bloq} bloqueados` : ''}</span><button class="ghost" id="mClose" aria-label="Fechar">✕</button></div>
-      <div class="mbody"><div class="card"><h2>Terapeutas livres neste horário</h2><div class="hint">Estão na casa nesse turno e sem paciente marcado na grade do Hipo.</div>
-      ${ls.length ? `<div class="lh-livres">${ls.map(p => `<a href="#" data-p="${p.id}" class="tag">${esc(p.nome)}</a>`).join('')}</div>` : '<div class="empty">Ninguém livre neste horário.</div>'}</div></div>`;
+      <div class="mbody"><div class="card"><h2>Terapeutas livres neste horário</h2><div class="hint">${mes ? `Em ${mesL(H.periodo)}: quantas ${DIAS[d + 1].toLowerCase()}s cada um esteve na casa nesse horário sem paciente. Quem aparece com todas livres é horário que dá para preencher.` : 'Estão na casa nesse turno e sem paciente marcado na grade do Hipo.'}</div>
+      ${ls.length ? (mes ? `<div class="tablewrap" style="max-height:480px"><table><thead><tr><th>Terapeuta</th><th class="num">Livre</th><th class="num">Na casa</th><th class="num">% livre</th></tr></thead><tbody>${ls.map(p => `<tr><td><a href="#" data-p="${p.id}" style="color:inherit">${esc(p.nome)}</a></td><td class="num"><b>${p.livre}</b></td><td class="num">${p.vezes}</td><td class="num">${pctf(Math.round(1000 * p.livre / p.vezes) / 10)}</td></tr>`).join('')}</tbody></table></div>`
+        : `<div class="lh-livres">${ls.map(p => `<a href="#" data-p="${p.id}" class="tag">${esc(p.nome)}</a>`).join('')}</div>`) : '<div class="empty">Ninguém livre neste horário.</div>'}</div></div>`;
     $('mClose').onclick = () => dlg.close();
     dlg.querySelectorAll('[data-p]').forEach(el => el.onclick = e => { e.preventDefault(); dlg.close(); openProf(+el.dataset.p); });
     if (!dlg.open) dlg.showModal();

@@ -792,8 +792,14 @@ function lotacao_horarios(array $f = []): array
                 $c['disp']++;
                 if ($st === 'o') {
                     $c['oc']++;
-                } elseif ($semana && isset($profs[$d['prof']])) {
-                    $c['livres'][] = ['id' => (int) $profs[$d['prof']]['id'], 'nome' => $profs[$d['prof']]['nome']];
+                }
+                // quem estava livre: na semana, uma vez; no mês, quantas vezes ficou livre nesse dia/horário
+                if (isset($profs[$d['prof']])) {
+                    $l = &$c['livres'][$d['prof']];
+                    $l ??= ['id' => (int) $profs[$d['prof']]['id'], 'nome' => $profs[$d['prof']]['nome'], 'livre' => 0, 'vezes' => 0];
+                    $l['vezes']++;
+                    $l['livre'] += $st === 'o' ? 0 : 1;
+                    unset($l);
                 }
             }
             unset($c);
@@ -801,8 +807,16 @@ function lotacao_horarios(array $f = []): array
     }
     $meses = rows("SELECT DISTINCT substr(data, 1, 7) m FROM hipo_sessoes ORDER BY 1 DESC");
     $ref = config_get('hipo_grade');
+    foreach ($cel as &$cd) {
+        foreach ($cd as &$c) {
+            $c['livres'] = array_values(array_filter($c['livres'], fn($l) => $l['livre'] > 0));
+        }
+        unset($c);
+    }
+    unset($cd);
     $fer = array_values(array_filter($feriados, fn($d) => $semana ? ($ref && $d >= $ref['de'] && $d <= $ref['ate']) : str_starts_with($d, $periodo)));
     return ['periodo' => $semana ? 'semana' : $periodo, 'referencia' => $ref, 'feriados' => $fer, 'dias_no_periodo' => count($datas),
             'horarios' => array_map(fn($g) => ['ini' => $g['hora_inicio'], 'fim' => $g['hora_fim']], $grade),
-            'celulas' => $cel, 'meses' => array_column($meses, 'm')];
+            'celulas' => $cel, 'meses' => array_column($meses, 'm'),
+            'extraido_em' => substr((string) (config_get('hipo_sessoes')['importado_em'] ?? ''), 0, 10)];
 }

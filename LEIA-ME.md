@@ -103,7 +103,7 @@ O Hipo Saúde (https://specially.hiposaudeintegrada.com.br) vai ser descontinuad
 - Parâmetros: `LOT_SESSOES_DIA`, `LOT_HORAS_DIA` e `LOT_DIAS_MAX` em `web/lib/hipo.php`.
 
 ### Ocupação por horário (aba Lotação)
-Mapa horário × dia com o % ocupado (`lotacao_horarios()` em `web/lib/hipo.php`, rota `api/lotacao/horarios`). Disponível = terapeuta na casa naquele horário (dentro do turno que ele costuma fazer naquele dia da semana) e sem bloqueio; ocupado = com paciente marcado (falta conta como ocupado; desmarcada e feriado não). Período: a semana da grade do Hipo (clicar no horário mostra quem está livre) ou um mês do histórico. Dias de feriado ficam fora da conta.
+Mapa horário × dia com o % ocupado (`lotacao_horarios()` em `web/lib/hipo.php`, rota `api/lotacao/horarios`). Disponível = terapeuta na casa naquele horário (dentro do turno que ele costuma fazer naquele dia da semana) e sem bloqueio; ocupado = com paciente marcado (falta conta como ocupado; desmarcada e feriado não). Período: a semana da grade do Hipo ou um mês do histórico (o mês da extração aparece como "agenda marcada"). Clicar num horário mostra quem está livre — no mês, quantas vezes cada terapeuta ficou livre naquele dia e horário. Dias de feriado ficam fora da conta.
 
 ## Repasse (aba Repasse)
 Quanto a clínica paga a cada terapeuta e quanto recebe pelas sessões dele, mês a mês. Código em `web/lib/repasse.php`.
